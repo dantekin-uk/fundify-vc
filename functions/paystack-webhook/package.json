@@ -1,0 +1,15 @@
+{
+  "name": "paystack-webhook",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for handling Paystack webhooks and updating Firebase Firestore",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --local"
+  },
+  "type": "module",
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

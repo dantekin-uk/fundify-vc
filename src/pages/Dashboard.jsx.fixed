@@ -1,0 +1,343 @@
+// ... (keep all the imports and component definition the same until the return statement)
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight dark:text-slate-100">
+            Dashboard
+          </h2>
+          <nav className="mt-2 flex space-x-3">
+            <Link 
+              to="/app/dashboard/overview" 
+              className={`px-3 py-1 rounded-md text-sm ${
+                active('overview') 
+                  ? 'button-brand' 
+                  : 'text-gray-600 bg-white border border-gray-100 dark:text-slate-300 dark:bg-slate-800 dark:border-slate-700'
+              }`}
+            >
+              Overview
+            </Link>
+            <Link 
+              to="/app/dashboard/funders" 
+              className={`px-3 py-1 rounded-md text-sm ${
+                active('funders') 
+                  ? 'button-brand' 
+                  : 'text-gray-600 bg-white border border-gray-100 dark:text-slate-300 dark:bg-slate-800 dark:border-slate-700'
+              }`}
+            >
+              Funders
+            </Link>
+            <Link 
+              to="/app/dashboard/projects" 
+              className={`px-3 py-1 rounded-md text-sm ${
+                active('projects') 
+                  ? 'button-brand' 
+                  : 'text-gray-600 bg-white border border-gray-100 dark:text-slate-300 dark:bg-slate-800 dark:border-slate-700'
+              }`}
+            >
+              Projects
+            </Link>
+          </nav>
+        </div>
+      </div>
+
+      {/* Overview Tab */}
+      {active('overview') && (
+        <div>
+          {/* Stats */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0">
+            {stats.map((s) => (
+              StatCard ? (
+                <StatCard
+                  key={s.name}
+                  title={s.name}
+                  value={s.value}
+                  rawValue={s.raw}
+                  variant={s.variant}
+                  series={seriesMap[s.name]}
+                />
+              ) : (
+                <div key={s.name} className="p-4 rounded bg-red-50 text-red-700">
+                  StatCard missing
+                </div>
+              )
+            ))}
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 min-w-0 mt-6">
+            <div className="lg:col-span-2 min-w-0">
+              {FundsChart ? <FundsChart /> : <div className="p-4">FundsChart missing</div>}
+            </div>
+            <div className="overflow-hidden rounded-2xl bg-white/90 backdrop-blur-sm ring-1 ring-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 dark:bg-slate-900/80 dark:ring-slate-700/50">
+              <div className="px-5 pt-5 pb-3">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Funding Sources</h3>
+                  <div className="flex space-x-1 p-0.5 bg-gray-100 dark:bg-slate-800 rounded-lg">
+                    {['income', 'expenses', 'available'].map((metric) => (
+                      <button
+                        key={metric}
+                        onClick={() => setFundingMetric(metric)}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                          fundingMetric === metric
+                            ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        {metric.charAt(0).toUpperCase() + metric.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {fundingRows.rows.length === 0 ? (
+                  <div className="text-sm text-gray-500 dark:text-slate-400 text-center py-4">
+                    No funding sources available
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {fundingRows.rows.slice(0, fundingShowAll ? fundingRows.rows.length : 5).map((f) => {
+                      const val = Number(f[fundingRows.metric] || 0);
+                      const pct = Math.round((Math.abs(val) / (fundingRows.maxVal || 1)) * 100);
+                      const isNegAvail = fundingRows.metric === 'available' && val < 0;
+                      
+                      // Calculate percentages for the stacked bar
+                      const total = Math.abs(f.income) + Math.abs(f.expenses) + Math.abs(f.available);
+                      const incomePct = total > 0 ? (Math.abs(f.income) / total) * 100 : 0;
+                      const expensesPct = total > 0 ? (Math.abs(f.expenses) / total) * 100 : 0;
+                      const availablePct = total > 0 ? (Math.abs(f.available) / total) * 100 : 0;
+                      
+                      // Colors for the stacked bar with better gradients
+                      const incomeGradient = 'linear-gradient(90deg, #10B981, #34D399)';
+                      const expensesGradient = 'linear-gradient(90deg, #EF4444, #F97316)';
+                      const availableGradient = isNegAvail 
+                        ? 'linear-gradient(90deg, #EF4444, #FB7185)' 
+                        : 'linear-gradient(90deg, #3B82F6, #8B5CF6)';
+                      
+                      return (
+                        <div key={f.funder.id} className="group">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate" title={f.funder.name}>
+                                {f.funder.name}
+                              </p>
+                            </div>
+                            <div className={`ml-2 text-right text-sm font-semibold whitespace-nowrap ${
+                              isNegAvail ? 'text-rose-600 dark:text-rose-400' : 'text-gray-700 dark:text-slate-200'
+                            }`}>
+                              {formatAmount(val, currency)}
+                            </div>
+                          </div>
+                          
+                          <div className="relative h-2.5 bg-slate-100 dark:bg-slate-800/50 rounded-full overflow-hidden">
+                            <div className="absolute inset-0 flex">
+                              {/* Income segment */}
+                              <div
+                                className="h-full transition-all duration-300 ease-out group-hover:brightness-110"
+                                style={{
+                                  width: `${incomePct}%`,
+                                  background: incomeGradient,
+                                  borderTopLeftRadius: '0.75rem',
+                                  borderBottomLeftRadius: '0.75rem',
+                                  borderTopRightRadius: incomePct < 100 ? 0 : '0.75rem',
+                                  borderBottomRightRadius: incomePct < 100 ? 0 : '0.75rem'
+                                }}
+                              />
+                              {/* Expenses segment */}
+                              <div
+                                className="h-full transition-all duration-300 ease-out group-hover:brightness-110"
+                                style={{
+                                  width: `${expensesPct}%`,
+                                  background: expensesGradient,
+                                  borderTopLeftRadius: incomePct <= 0 ? '0.75rem' : 0,
+                                  borderBottomLeftRadius: incomePct <= 0 ? '0.75rem' : 0,
+                                  borderTopRightRadius: (incomePct + expensesPct) < 100 ? 0 : '0.75rem',
+                                  borderBottomRightRadius: (incomePct + expensesPct) < 100 ? 0 : '0.75rem'
+                                }}
+                              />
+                              {/* Available segment */}
+                              <div
+                                className="h-full transition-all duration-300 ease-out group-hover:brightness-110"
+                                style={{
+                                  width: `${availablePct}%`,
+                                  background: availableGradient,
+                                  borderTopLeftRadius: (incomePct + expensesPct) <= 0 ? '0.75rem' : 0,
+                                  borderBottomLeftRadius: (incomePct + expensesPct) <= 0 ? '0.75rem' : 0,
+                                  borderTopRightRadius: '0.75rem',
+                                  borderBottomRightRadius: '0.75rem'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {fundingRows.rows.length > 5 && (
+                      <button
+                        onClick={() => setFundingShowAll(!fundingShowAll)}
+                        className="w-full py-2 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 mt-2"
+                      >
+                        {fundingShowAll ? 'Show less' : `Show all ${fundingRows.rows.length} sources`}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Project Expenses Stacked Bar + Pie Chart */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 mt-6 min-w-0">
+            <div className="lg:col-span-2 min-w-0">
+              {ProjectExpensesStackedBar ? (
+                <ProjectExpensesStackedBar timeRange={timeRange} compact />
+              ) : (
+                <div className="p-4">ProjectExpensesStackedBar missing</div>
+              )}
+            </div>
+            <div>
+              {ExpensePieChart ? (
+                <ExpensePieChart compact />
+              ) : (
+                <div className="p-4">ExpensePieChart missing</div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Activities */}
+          <div className="mt-8">
+            {RecentActivities ? (
+              <RecentActivities full />
+            ) : (
+              <div className="p-4">RecentActivities missing</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Funders Tab */}
+      {active('funders') && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Funders</h3>
+          <div className="pt-2">
+            <input 
+              value={funderQuery} 
+              onChange={(e) => setFunderQuery(e.target.value)} 
+              placeholder="Search funders" 
+              className="w-full px-3 py-2 rounded-md ring-1 ring-gray-200 bg-white text-sm placeholder:text-gray-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700" 
+            />
+          </div>
+
+          <div className="mt-4">
+            <FundersExpensesStackedBar timeRange={timeRange} />
+          </div>
+
+          {(byFunder || []).filter(f => !funderQuery || (f.funder.name || '').toLowerCase().includes(funderQuery.toLowerCase())).length ? (
+            <div className="grid grid-cols-1 gap-3">
+              {(byFunder || []).filter(f => !funderQuery || (f.funder.name || '').toLowerCase().includes(funderQuery.toLowerCase())).map((f) => (
+                <div key={f.funder.id} className="rounded-lg border border-gray-200 p-4 bg-white flex justify-between items-center gap-3 min-w-0 dark:bg-slate-900/70 dark:border-slate-800 dark:text-slate-100">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-900 truncate dark:text-slate-100" title={f.funder.name}>{f.funder.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-slate-300">Allocation: {formatAmount(f.allocation, currency)}</div>
+                    <div className="space-y-2 mt-3">
+                      {/* Budget Utilization */}
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                          <span>Budget Used</span>
+                          <span className="font-medium">
+                            {Math.round((f.used / f.allocation) * 100)}%
+                          </span>
+                        </div>
+                        <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500 ease-out"
+                            style={{
+                              width: `${Math.min((f.used / f.allocation) * 100, 100)}%`,
+                              minWidth: '4px'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Expense Ratio */}
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                          <span>Expense Ratio</span>
+                          <span className="font-medium">
+                            {f.income > 0 ? Math.round((f.expenses / f.income) * 100) : 0}%
+                          </span>
+                        </div>
+                        <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-500 ease-out"
+                            style={{
+                              width: `${Math.min((f.expenses / (f.income || 1)) * 100, 100)}%`,
+                              minWidth: '4px'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-gray-700 dark:text-slate-200 font-semibold whitespace-nowrap overflow-hidden text-ellipsis" title={formatAmount(f.available, currency)}>
+                    {formatAmount(f.available, currency)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-slate-400">No funders match your search.</div>
+          )}
+        </div>
+      )}
+
+      {/* Projects Tab */}
+      {active('projects') && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Projects</h3>
+          <div className="pt-2">
+            <input 
+              value={projectQuery} 
+              onChange={(e) => setProjectQuery(e.target.value)} 
+              placeholder="Search projects" 
+              className="w-full px-3 py-2 rounded-md ring-1 ring-gray-200 bg-white text-sm placeholder:text-gray-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700" 
+            />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ProjectExpensesStackedBar timeRange={timeRange} compact />
+            <ExpensePieChart compact />
+          </div>
+
+          {(byProject || []).filter(p => !projectQuery || (p.project.name || '').toLowerCase().includes(projectQuery.toLowerCase())).length ? (
+            <div className="grid grid-cols-1 gap-3">
+              {(byProject || []).filter(p => !projectQuery || (p.project.name || '').toLowerCase().includes(projectQuery.toLowerCase())).map((p) => (
+                <div key={p.project.id} className="rounded-lg border border-gray-200 p-4 bg-white flex justify-between items-center gap-3 min-w-0 dark:bg-slate-900/70 dark:border-slate-800 dark:text-slate-100">
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900 truncate dark:text-slate-100" title={p.project.name}>
+                      {p.project.name}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-slate-300">
+                      Budget: {formatAmount(Number(p.project.allocation || 0), currency)}
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-gray-700 dark:text-slate-200 font-semibold whitespace-nowrap overflow-hidden text-ellipsis" 
+                       title={formatAmount(p.available, currency)}>
+                    Available: {formatAmount(p.available, currency)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-slate-400">No projects match your search.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Dashboard;

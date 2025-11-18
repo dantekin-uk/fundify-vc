@@ -1,0 +1,15 @@
+name = "paystack-worker"
+type = "javascript"
+
+account_id = "your_account_id"
+workers_dev = true
+compatibility_date = "2023-10-01"
+
+[env.production]
+workers_dev = false
+route = "your_route/*"
+zone_id = "your_zone_id"
+
+[build]
+command = "npm install"
+cwd = "src"
