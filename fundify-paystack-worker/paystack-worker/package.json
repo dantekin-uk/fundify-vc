@@ -1,0 +1,27 @@
+{
+  "name": "paystack-worker",
+  "version": "1.0.0",
+  "description": "A Cloudflare Worker for handling Paystack webhooks, validating events, confirming payments, and updating dashboards.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "wrangler dev",
+    "build": "wrangler build",
+    "deploy": "wrangler publish"
+  },
+  "dependencies": {
+    "axios": "^0.21.1",
+    "@google-cloud/firestore": "^5.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^1.19.0"
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "paystack",
+    "webhooks",
+    "firestore"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

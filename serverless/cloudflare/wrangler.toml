@@ -1,0 +1,11 @@
+name = "invite-email"
+main = "src/worker.js"
+compatibility_date = "2024-06-01"
+
+# Set this to the verified sender email in Resend (e.g., no-reply@yourdomain.com)
+# You can also set it at deploy time with `wrangler kv:key put` or via dashboard env vars
+[vars]
+FROM_EMAIL = "no-reply@example.com"
+
+# Add your RESEND_API_KEY as a secret
+# wrangler secret put RESEND_API_KEY

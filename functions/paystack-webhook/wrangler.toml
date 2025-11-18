@@ -1,0 +1,22 @@
+name = "fundify-paystack-worker"
+main = "./index.js"
+account_id = "72c2ac4e51f5e87f7223b50557a67237"
+workers_dev = true
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "paystack-webhook"
+route = "your-domain.com/api/webhooks/paystack"
+zone_id = "YOUR_ZONE_ID"
+
+[env.development]
+workers_dev = true
+
+[vars]
+# Environment variables (public, safe to include)
+FIREBASE_PROJECT_ID = "fundify-3df97"
+FIREBASE_API_KEY = "AIzaSyA3uF3oPuc_Qrre0IniQtf6dRoZ37dMD-k"
+
+[[env.production.vars]]
+FIREBASE_PROJECT_ID = "fundify-3df97"
+FIREBASE_API_KEY = "AIzaSyA3uF3oPuc_Qrre0IniQtf6dRoZ37dMD-k"

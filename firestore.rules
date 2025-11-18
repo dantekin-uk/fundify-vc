@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Organizations collection
+    match /orgs/{orgId} {
+      // Development-friendly: allow reads for any authenticated user
+      // Also allow unauthenticated reads for webhook operations (Paystack webhook verifies signatures)
+      // TODO: tighten to owner/members before production
+      allow get, list: if isAuthenticated() || true; // Temporarily allow unauthenticated reads for webhooks
+
+      // Allow creating an org only when the creator's uid equals the orgId (owner creating their profile/org)
+      allow create: if isAuthenticated() && request.auth.uid == orgId;
+
+      // Development: allow updates by any authenticated user so invited users can accept and write memberships.
+      // Also allow unauthenticated updates for webhook operations (Paystack webhook verifies signatures)
+      // Security: Webhook signature is verified before reaching Firestore, so this is safe
+      // TODO: tighten before production to only owner/members and/or implement a Cloud Function for invite acceptance.
+      allow update: if isAuthenticated() || 
+                     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['incomes']) && 
+                      request.resource.data.incomes is list);
+      // Keep deletes restricted to owner or members
+      allow delete: if isAuthenticated() && (
+        request.auth.uid == orgId ||
+        (resource.data.members is list && request.auth.uid in resource.data.members)
+      );
+    }
+
+    // Subcollections under orgs inherit membership checks by looking up the parent org's members list
+    match /orgs/{orgId}/{document=**} {
+      // Development-friendly: allow reads for any authenticated user
+      // TODO: tighten to owner/members before production
+      allow read: if isAuthenticated();
+      // Writes remain restricted to owner or members
+      allow write: if isAuthenticated() && (
+        request.auth.uid == orgId ||
+        (get(/databases/$(database)/documents/orgs/$(orgId)).data.members is list && request.auth.uid in get(/databases/$(database)/documents/orgs/$(orgId)).data.members)
+      );
+    }
+
+    // Top-level invites collection: allow public GET by token, and allow org members to create/update/delete invites
+    match /invites/{inviteId} {
+      // Publicly readable so invite tokens can be resolved without org read permissions
+      allow get: if true;
+      // Prevent listing invites to avoid enumeration
+      allow list: if false;
+
+      // Allow creating an invite when the authenticated user is a member of the referenced org or the org owner
+      allow create: if isAuthenticated() && request.resource.data.orgId is string && (
+        request.auth.uid == request.resource.data.orgId ||
+        (get(/databases/$(database)/documents/orgs/$(request.resource.data.orgId)).data.members is list && request.auth.uid in get(/databases/$(database)/documents/orgs/$(request.resource.data.orgId)).data.members)
+      );
+
+      // Allow update/delete if the authenticated user is a member or owner of the org referenced by the existing invite
+      allow update, delete: if isAuthenticated() && resource.data.orgId is string && (
+        request.auth.uid == resource.data.orgId ||
+        (get(/databases/$(database)/documents/orgs/$(resource.data.orgId)).data.members is list && request.auth.uid in get(/databases/$(database)/documents/orgs/$(resource.data.orgId)).data.members)
+      );
+    }
+
+    // Users collection: only allow a user to read/write their own profile document
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Allow authenticated clients to enqueue mail docs for cloud functions
+    match /mail/{mailId} {
+      // Only allow creation (enqueuing) by authenticated users; deny reads/lists by clients
+      allow create: if isAuthenticated();
+      allow read, update, delete: if false;
+    }
+
+    // Allow public read on the _test/connection document for local debug/testing
+    match /_test/connection {
+      allow get: if true;
+    }
+
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,8 @@
+connectorId: example
+generate:
+  javascriptSdk:
+    - outputDir: ..\..\financial\src\dataconnect-generated
+      package: "@dataconnect/generated"
+      packageJsonDir: ..\..\financial
+      react: true
+      angular: false
