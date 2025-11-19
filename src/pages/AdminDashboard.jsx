@@ -86,7 +86,8 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <Layout>
+      <div className="space-y-6">
       {/* Payment Integration Section */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 mb-6">
         <h3 className="text-lg font-semibold mb-2">Payment Integration</h3>
@@ -344,7 +345,8 @@ const AdminDashboard = () => {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 };
 
