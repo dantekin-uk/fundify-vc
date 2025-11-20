@@ -17,12 +17,21 @@ export default function IntegrationPage({ orgId }) {
 
   useEffect(() => {
     async function fetchSubaccount() {
+      setLoading(true);
+      setError("");
       try {
         const res = await axios.get(`/api/subaccount?orgId=${orgId}`);
         setSubaccount(res.data?.subaccount ?? null);
-      } catch (e) {}
+      } catch (err) {
+        console.error("Error fetching subaccount:", err);
+        setError(err.response?.data?.message || "Failed to load integration details.");
+      } finally {
+        setLoading(false);
+      }
     }
-    fetchSubaccount();
+    if (orgId) {
+      fetchSubaccount();
+    }
   }, [orgId]);
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
