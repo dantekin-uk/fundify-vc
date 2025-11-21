@@ -44,6 +44,6 @@ export default async function handler(req, res) {
     const subaccount = snapshot.docs[0].data();
     res.status(200).json({ subaccount });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'An internal server error occurred.', error: error.message });
   }
 }
