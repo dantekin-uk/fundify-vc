@@ -43,7 +43,7 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
 
       // Open Paystack payment modal with complete metadata
       await openPaystack({
-        key: process.env.REACT_APP_PAYSTACK_PUBLIC_KEY,
+        key: import.meta.env.REACT_APP_PAYSTACK_PUBLIC_KEY,
         email: user?.email || '',
         amount: amountValue * 100, // Convert to kobo (Paystack uses kobo)
         currency: orgCurrency || 'NGN',
