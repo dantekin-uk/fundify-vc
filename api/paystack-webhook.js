@@ -38,46 +38,40 @@ export default async function handler(req, res) {
 
   const { data } = event;
   const { reference, amount, currency, status, metadata } = data;
-  const { funderId, ngoId } = metadata || {};
+  const { funderId } = metadata || {};
+  const orgId = (metadata && (metadata.orgId || metadata.ngoId)) || null;
 
-  if (!funderId || !ngoId) {
-    console.error('Missing funderId or ngoId in transaction metadata', { reference });
-    return res.status(400).json({ error: 'Bad Request: Missing funderId or ngoId in metadata' });
+  if (!funderId || !orgId) {
+    console.error('Missing funderId or orgId in transaction metadata', { reference });
+    return res.status(400).json({ error: 'Bad Request: Missing funderId or orgId in metadata' });
   }
 
   const amountInNaira = amount / 100;
 
   try {
-    const ngoRef = db.collection('ngos').doc(ngoId);
-    const transactionRef = db.collection('transactions').doc(reference);
-    const ngoTransactionRef = db.collection('ngos').doc(ngoId).collection('transactions').doc(reference);
-
+    const orgRef = db.collection('orgs').doc(orgId);
     await db.runTransaction(async (t) => {
-      const ngoDoc = await t.get(ngoRef);
-      if (!ngoDoc.exists) {
-        throw new Error(`NGO with ID ${ngoId} not found.`);
+      const orgDoc = await t.get(orgRef);
+      if (!orgDoc.exists) {
+        throw new Error(`Org with ID ${orgId} not found.`);
       }
 
-      const ngoData = ngoDoc.data();
-      const subaccountId = ngoData.paystackSubaccountId || null;
-
-      const transactionData = {
-        transactionId: reference,
+      const incomeEntry = {
+        id: reference,
         amount: amountInNaira,
         currency,
         status,
-        funderId,
-        ngoId,
-        subaccountId,
-        paidAt: new Date(data.paid_at),
+        walletId: funderId,
+        date: data.paid_at,
+        paystack_reference: reference,
+        paystack_event: event,
         createdAt: FieldValue.serverTimestamp(),
       };
 
-      t.set(transactionRef, transactionData);
-      t.set(ngoTransactionRef, transactionData);
-      t.update(ngoRef, {
-        totalFunds: FieldValue.increment(amountInNaira),
-      });
+      const current = orgDoc.data();
+      const incomes = Array.isArray(current.incomes) ? current.incomes.slice() : [];
+      incomes.push(incomeEntry);
+      t.update(orgRef, { incomes });
     });
 
     console.log(`Successfully processed transaction: ${reference} for NGO: ${ngoId}`);

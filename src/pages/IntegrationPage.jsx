@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useOrg } from "../context/OrgContext";
 // Modern Inter font
 import "@fontsource/inter";
 
-export default function IntegrationPage({ orgId }) {
+export default function IntegrationPage() {
+  const { activeOrgId } = useOrg();
+  const API_BASE = (import.meta.env.VITE_SERVERLESS_BASE_URL || import.meta.env.VITE_API_BASE_URL || "").trim();
   const [form, setForm] = useState({
     business_name: "",
     settlement_bank: "",
@@ -20,7 +23,8 @@ export default function IntegrationPage({ orgId }) {
       setLoading(true);
       setError("");
       try {
-        const res = await axios.get(`/api/subaccount?orgId=${orgId}`);
+        const url = API_BASE ? `${API_BASE}/api/subaccount?orgId=${activeOrgId}` : `/api/subaccount?orgId=${activeOrgId}`;
+        const res = await axios.get(url);
         setSubaccount(res.data?.subaccount ?? null);
       } catch (err) {
         console.error("Error fetching subaccount:", err);
@@ -29,10 +33,10 @@ export default function IntegrationPage({ orgId }) {
         setLoading(false);
       }
     }
-    if (orgId) {
+    if (activeOrgId) {
       fetchSubaccount();
     }
-  }, [orgId]);
+  }, [activeOrgId]);
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -40,7 +44,8 @@ export default function IntegrationPage({ orgId }) {
     setLoading(true); setError("");
     try {
       // Call Vercel serverless function for subaccount creation
-      const res = await axios.post("/api/create-subaccount", { orgId, ...form });
+      const url = API_BASE ? `${API_BASE}/api/create-subaccount` : "/api/create-subaccount";
+      const res = await axios.post(url, { orgId: activeOrgId, ...form });
       setSubaccount(res.data.subaccount);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create subaccount");

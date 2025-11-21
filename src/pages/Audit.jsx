@@ -142,7 +142,7 @@ export default function Audit() {
                   try {
                     // perform soft delete and allow undo via toast
                     softRemoveLog(confirm.id);
-                    const UNDO_MS = Number(process.env.REACT_APP_UNDO_WINDOW_MS) || 6000;
+                    const UNDO_MS = Number(import.meta.env.REACT_APP_UNDO_WINDOW_MS || import.meta.env.VITE_UNDO_WINDOW_MS) || 6000;
                     const timer = setTimeout(() => { try { finalizeRemoveLog(confirm.id); } catch (e) { console.error(e); } setPendingDeletes((s) => s.filter((p) => p.id !== confirm.id)); }, UNDO_MS);
                     setPendingDeletes((s) => [...s, { id: confirm.id, timer }]);
                   } catch (e) {

@@ -28,7 +28,7 @@ export default function RecentActivities({ full = false }) {
   const { logs = [], removeItem, softRemoveLog, restoreLog, finalizeRemoveLog } = useFinance();
   const { activeOrg, role: orgRole } = useOrg();
   const { user } = useAuth();
-  const UNDO_MS = Number(process.env.REACT_APP_UNDO_WINDOW_MS) || 6000;
+  const UNDO_MS = Number(import.meta.env.REACT_APP_UNDO_WINDOW_MS || import.meta.env.VITE_UNDO_WINDOW_MS) || 6000;
   const isSystemAction = (a) => {
     const s = String(a || '').toLowerCase();
     return s.startsWith('log_') || s === 'item_removed';

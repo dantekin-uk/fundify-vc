@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  // Explicitly expose Paystack public key if provided (do NOT expose secrets)
+  if (env.PAYSTACK_PUBLIC_KEY) {
+    define['import.meta.env.PAYSTACK_PUBLIC_KEY'] = JSON.stringify(env.PAYSTACK_PUBLIC_KEY);
+  }
+
   return {
     plugins: [
       react({ jsxRuntime: 'automatic' })

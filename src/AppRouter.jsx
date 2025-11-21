@@ -180,6 +180,7 @@ function AppContent() {
           <Route path="reports" element={<Reports />} />
           <Route path="reports/funder/:id" element={<ReportsFunder />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="integration" element={<IntegrationPage />} />
           <Route path="integration" element={<IntegrationPage orgId={useOrg()?.activeOrgId} />} />
           <Route path="donor-portal" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
           <Route path="funders/portal" element={<FunderPortal />} />
