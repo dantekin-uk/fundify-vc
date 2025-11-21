@@ -6,13 +6,13 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 const AuthContext = createContext(null);
 
-// Development fallback: set REACT_APP_DEV_AUTH=true in .env.local to enable a local dev user
-const IS_DEV_AUTH = process.env.REACT_APP_DEV_AUTH === 'true';
+// Development fallback: set REACT_APP_DEV_AUTH=true or VITE_DEV_AUTH=true in .env.local to enable a local dev user
+const IS_DEV_AUTH = (import.meta.env.REACT_APP_DEV_AUTH === 'true') || (import.meta.env.VITE_DEV_AUTH === 'true');
 const DEV_USER = {
-  id: process.env.REACT_APP_DEV_USER_ID || 'dev-uid',
-  email: process.env.REACT_APP_DEV_USER_EMAIL || 'dev@local',
-  name: process.env.REACT_APP_DEV_USER_NAME || 'Developer',
-  hasCompletedSetup: process.env.REACT_APP_DEV_USER_SETUP === 'true' ? true : true,
+  id: import.meta.env.REACT_APP_DEV_USER_ID || import.meta.env.VITE_DEV_USER_ID || 'dev-uid',
+  email: import.meta.env.REACT_APP_DEV_USER_EMAIL || import.meta.env.VITE_DEV_USER_EMAIL || 'dev@local',
+  name: import.meta.env.REACT_APP_DEV_USER_NAME || import.meta.env.VITE_DEV_USER_NAME || 'Developer',
+  hasCompletedSetup: (import.meta.env.REACT_APP_DEV_USER_SETUP === 'true') || (import.meta.env.VITE_DEV_USER_SETUP === 'true') ? true : true,
   orgSettings: { currency: 'USD', fiscalYearStartMonth: 1 },
 };
 

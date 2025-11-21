@@ -28,6 +28,7 @@ import LoginModal from './components/LoginModal';
 import Members from './pages/Members';
 import AcceptInvite from './pages/AcceptInvite';
 import Settings from './pages/Settings';
+import IntegrationPage from './pages/IntegrationPage';
 import FunderPortal from './pages/FunderPortal';
 import FunderPortalOverview from './pages/FunderPortalOverview';
 import AdminDashboard from './pages/AdminDashboard';
@@ -120,6 +121,7 @@ function AppContent() {
           <Route path="reports" element={<Reports />} />
           <Route path="reports/funder/:id" element={<ReportsFunder />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="integration" element={<IntegrationPage />} />
           <Route path="donor-portal" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
           <Route path="funders/portal" element={<FunderPortal />} />
           <Route path="funders/portal/:id" element={<FunderPortal />} />

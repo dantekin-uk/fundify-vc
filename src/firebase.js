@@ -6,28 +6,37 @@ import { initializeFirestore, connectFirestoreEmulator, getFirestore, doc, getDo
 
 // Check if we're in development mode
 const isDev = import.meta.env.MODE === 'development';
+const ENV = import.meta.env || {};
+const read = (...keys) => {
+  for (const k of keys) {
+    const v = ENV[k];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return undefined;
+};
 
 // Log environment variables in development for debugging
 if (isDev) {
   console.log('Firebase Config:', {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? '***' : 'Not set',
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'Not set',
-    appId: import.meta.env.VITE_FIREBASE_APP_ID ? '***' : 'Not set'
+    apiKey: read('VITE_FIREBASE_API_KEY','REACT_APP_FIREBASE_API_KEY') ? '***' : 'Not set',
+    projectId: read('VITE_FIREBASE_PROJECT_ID','REACT_APP_FIREBASE_PROJECT_ID') || 'Not set',
+    appId: read('VITE_FIREBASE_APP_ID','REACT_APP_FIREBASE_APP_ID') ? '***' : 'Not set'
   });
 }
 
 // Validate required environment variables
-const requiredEnvVars = [
-  'VITE_FIREBASE_API_KEY',
-  'VITE_FIREBASE_AUTH_DOMAIN',
-  'VITE_FIREBASE_PROJECT_ID',
-  'VITE_FIREBASE_STORAGE_BUCKET',
-  'VITE_FIREBASE_MESSAGING_SENDER_ID',
-  'VITE_FIREBASE_APP_ID',
-  'VITE_FIREBASE_MEASUREMENT_ID'
+const requiredPairs = [
+  ['VITE_FIREBASE_API_KEY','REACT_APP_FIREBASE_API_KEY'],
+  ['VITE_FIREBASE_AUTH_DOMAIN','REACT_APP_FIREBASE_AUTH_DOMAIN'],
+  ['VITE_FIREBASE_PROJECT_ID','REACT_APP_FIREBASE_PROJECT_ID'],
+  ['VITE_FIREBASE_STORAGE_BUCKET','REACT_APP_FIREBASE_STORAGE_BUCKET'],
+  ['VITE_FIREBASE_MESSAGING_SENDER_ID','REACT_APP_FIREBASE_MESSAGING_SENDER_ID'],
+  ['VITE_FIREBASE_APP_ID','REACT_APP_FIREBASE_APP_ID'],
+  ['VITE_FIREBASE_MEASUREMENT_ID','REACT_APP_FIREBASE_MEASUREMENT_ID'],
 ];
-
-const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
+const missingVars = requiredPairs
+  .filter(([a,b]) => !read(a,b))
+  .map(([a,b]) => `${a} or ${b}`);
 if (missingVars.length > 0) {
   console.error('Missing required Firebase environment variables:', missingVars);
   if (!isDev) {
@@ -36,13 +45,13 @@ if (missingVars.length > 0) {
 }
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: read('VITE_FIREBASE_API_KEY','REACT_APP_FIREBASE_API_KEY'),
+  authDomain: read('VITE_FIREBASE_AUTH_DOMAIN','REACT_APP_FIREBASE_AUTH_DOMAIN'),
+  projectId: read('VITE_FIREBASE_PROJECT_ID','REACT_APP_FIREBASE_PROJECT_ID'),
+  storageBucket: read('VITE_FIREBASE_STORAGE_BUCKET','REACT_APP_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: read('VITE_FIREBASE_MESSAGING_SENDER_ID','REACT_APP_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: read('VITE_FIREBASE_APP_ID','REACT_APP_FIREBASE_APP_ID'),
+  measurementId: read('VITE_FIREBASE_MEASUREMENT_ID','REACT_APP_FIREBASE_MEASUREMENT_ID'),
 };
 
 // Initialize Firebase
@@ -52,7 +61,7 @@ let db;
 
 // Basic validation for API key
 if (!firebaseConfig.apiKey || typeof firebaseConfig.apiKey !== 'string' || firebaseConfig.apiKey.length < 20) {
-  console.error('Invalid or missing Firebase API key. Please ensure REACT_APP_FIREBASE_API_KEY is set in financial/.env or your environment. Current value:', firebaseConfig.apiKey ? '***' : 'Not set');
+  console.error('Invalid or missing Firebase API key. Please ensure VITE_FIREBASE_API_KEY or REACT_APP_FIREBASE_API_KEY is set in financial/.env. Current value:', firebaseConfig.apiKey ? '***' : 'Not set');
   if (!isDev) {
     throw new Error('Invalid Firebase API key. Aborting initialization.');
   }
@@ -74,7 +83,8 @@ if (!getApps().length) {
     });
 
     // Connect to emulators in development
-    if (isDev && process.env.REACT_APP_USE_FIREBASE_EMULATORS === 'true') {
+    const useEmu = (ENV.REACT_APP_USE_FIREBASE_EMULATORS === 'true') || (ENV.VITE_USE_FIREBASE_EMULATORS === 'true');
+    if (isDev && useEmu) {
       connectAuthEmulator(auth, 'http://localhost:9099');
       connectFirestoreEmulator(db, 'localhost', 8080);
       console.log('Using Firebase Emulators');
@@ -98,11 +108,11 @@ if (!getApps().length) {
     // Provide clearer guidance on invalid API key errors
     if (error && (error.code === 'auth/invalid-api-key' || (error.message && error.message.includes('invalid-api-key')))) {
       console.error('Firebase initialization failed with auth/invalid-api-key. Possible causes:');
-      console.error('- The API key is incorrect or missing in financial/.env (REACT_APP_FIREBASE_API_KEY)');
+      console.error('- The API key is incorrect or missing in financial/.env (VITE_FIREBASE_API_KEY or REACT_APP_FIREBASE_API_KEY)');
       console.error('- The dev server was not restarted after updating .env');
       console.error('- You are running a different app instance that does not load financial/.env');
       console.error('Actions to fix:');
-      console.error('1) Verify financial/.env contains the correct REACT_APP_FIREBASE_* values.');
+      console.error('1) Verify financial/.env contains the correct VITE_FIREBASE_* or REACT_APP_FIREBASE_* values.');
       console.error('2) Restart the dev server so CRA picks up the env changes.');
       console.error('3) Ensure you are editing the same project that is running at the dev URL.');
     }
