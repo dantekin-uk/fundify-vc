@@ -392,6 +392,21 @@ export function OrgProvider({ children }) {
     }
   }
 
+  async function setOrgCurrency(newCurrency) {
+    if (!activeOrgId || !newCurrency) return { success: false };
+    try {
+      const ref = doc(db, 'orgs', activeOrgId);
+      const snap = await getDoc(ref);
+      const data = snap.exists() ? snap.data() : {};
+      const currentSettings = typeof data.orgSettings === 'object' && data.orgSettings !== null ? data.orgSettings : {};
+      const nextSettings = { ...currentSettings, currency: newCurrency };
+      await updateDoc(ref, { orgSettings: nextSettings });
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e?.message || 'Failed to update currency' };
+    }
+  }
+
   async function removeMember(targetUserId) {
     if (!activeOrgId) return { success: false };
     try {
