@@ -47,7 +47,7 @@ export default async function handler(req, res) {
   const email = req.body.contact_email || req.body.email;
   const bank = req.body.settlement_bank || req.body.bank;
   const accountNumber = req.body.account_number || req.body.accountNumber;
-  const currency = req.body.currency || 'NGN';
+  const currency = req.body.currency || 'KES';
 
   if (!orgId || !name || !email || !bank || !accountNumber) {
     return res.status(400).json({ error: 'Missing required fields: orgId, name, email, bank, accountNumber' });
@@ -61,30 +61,28 @@ export default async function handler(req, res) {
     let data = null;
 
     if (hasSecret) {
-      const normalize = (s) => String(s || '').trim().toUpperCase();
-      const bankMap = {
-        'ACCESS': '044', 'ACCESS BANK': '044', 'ACCESS BANK PLC': '044',
-        'ZENITH': '057', 'ZENITH BANK': '057',
-        'GTBANK': '058', 'GUARANTY TRUST BANK': '058', 'GUARANTY TRUST BANK PLC': '058', 'GTB': '058',
-        'FIRST BANK': '011', 'FIRST BANK OF NIGERIA': '011',
-        'UBA': '033', 'UNITED BANK FOR AFRICA': '033',
-        'FIDELITY': '070', 'FIDELITY BANK': '070',
-        'FCMB': '214', 'FIRST CITY MONUMENT BANK': '214',
-        'POLARIS': '076', 'POLARIS BANK': '076',
-        'ECOBANK': '050', 'ECOBANK NIGERIA': '050',
-        'KEYSTONE': '082', 'KEYSTONE BANK': '082',
-        'UNITY': '215', 'UNITY BANK': '215',
-        'STANBIC': '221', 'STANBIC IBTC': '221', 'STANBIC IBTC BANK': '221',
-        'STERLING': '232', 'STERLING BANK': '232',
-        'WEMA': '035', 'WEMA BANK': '035'
-      };
+      const normalize = (s) => String(s || '').trim();
       let bankCode = String(bank || '').trim();
       if (!/^[0-9]{3}$/.test(bankCode)) {
-        const key = normalize(bank);
-        bankCode = bankMap[key] || null;
+        try {
+          const country = (currency || '').toUpperCase() === 'KES' ? 'kenya' : 'nigeria';
+          const list = await axios.get(`https://api.paystack.co/bank`, {
+            params: { country },
+            headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
+          });
+          const banks = Array.isArray(list.data?.data) ? list.data.data : [];
+          const target = banks.find((b) => {
+            const n = normalize(b.name).toLowerCase();
+            const q = normalize(bank).toLowerCase();
+            return n === q || n.includes(q);
+          });
+          bankCode = target?.code || null;
+        } catch (e) {
+          return res.status(400).json({ error: 'Could not resolve settlement_bank for country. Provide valid bank code.' });
+        }
       }
       if (!bankCode) {
-        return res.status(400).json({ error: 'Invalid settlement_bank. Provide bank 3-digit code or known bank name.' });
+        return res.status(400).json({ error: 'Invalid settlement_bank. Provide valid bank code or exact bank name.' });
       }
 
       const paystackResponse = await axios.post(

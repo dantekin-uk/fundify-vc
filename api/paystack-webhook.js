@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Bad Request: Missing funderId or orgId in metadata' });
   }
 
-  const amountInNaira = amount / 100;
+  const amountInMajorUnits = amount / 100;
 
   try {
     const orgRef = db.collection('orgs').doc(orgId);
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
       const incomeEntry = {
         id: reference,
-        amount: amountInNaira,
+        amount: amountInMajorUnits,
         currency,
         status,
         walletId: funderId,

@@ -46,7 +46,7 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
         key: (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.REACT_APP_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY),
         email: user?.email || '',
         amount: amountValue * 100, // Convert to kobo (Paystack uses kobo)
-        currency: orgCurrency || 'NGN',
+        currency: orgCurrency || 'KES',
         reference,
         metadata: {
           orgId: activeOrgId,
@@ -104,7 +104,7 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
-            Amount ({orgCurrency || 'NGN'})
+            Amount ({orgCurrency || 'KES'})
           </label>
           <input
             type="number"
