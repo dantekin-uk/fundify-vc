@@ -53,34 +53,68 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing required fields: orgId, name, email, bank, accountNumber' });
   }
 
-  if (!process.env.PAYSTACK_SECRET_KEY) {
-    return res.status(500).json({ error: 'Missing PAYSTACK_SECRET_KEY environment variable' });
-  }
+  const hasSecret = !!process.env.PAYSTACK_SECRET_KEY;
 
   try {
     const db = ensureDb();
-    // 1. Create Paystack Subaccount
-    const paystackResponse = await axios.post(
-      'https://api.paystack.co/subaccount',
-      {
-        business_name: name,
-        settlement_bank: bank,
-        account_number: accountNumber,
-        percentage_charge: 10,
-        currency,
-        primary_contact_email: email,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    let subaccount_code = null;
+    let data = null;
 
-    const data = paystackResponse.data.data || {};
-    const subaccount_code = data.subaccount_code;
-    if (!subaccount_code) throw new Error('No subaccount_code returned by Paystack');
+    if (hasSecret) {
+      const normalize = (s) => String(s || '').trim().toUpperCase();
+      const bankMap = {
+        'ACCESS': '044', 'ACCESS BANK': '044', 'ACCESS BANK PLC': '044',
+        'ZENITH': '057', 'ZENITH BANK': '057',
+        'GTBANK': '058', 'GUARANTY TRUST BANK': '058', 'GUARANTY TRUST BANK PLC': '058', 'GTB': '058',
+        'FIRST BANK': '011', 'FIRST BANK OF NIGERIA': '011',
+        'UBA': '033', 'UNITED BANK FOR AFRICA': '033',
+        'FIDELITY': '070', 'FIDELITY BANK': '070',
+        'FCMB': '214', 'FIRST CITY MONUMENT BANK': '214',
+        'POLARIS': '076', 'POLARIS BANK': '076',
+        'ECOBANK': '050', 'ECOBANK NIGERIA': '050',
+        'KEYSTONE': '082', 'KEYSTONE BANK': '082',
+        'UNITY': '215', 'UNITY BANK': '215',
+        'STANBIC': '221', 'STANBIC IBTC': '221', 'STANBIC IBTC BANK': '221',
+        'STERLING': '232', 'STERLING BANK': '232',
+        'WEMA': '035', 'WEMA BANK': '035'
+      };
+      let bankCode = String(bank || '').trim();
+      if (!/^[0-9]{3}$/.test(bankCode)) {
+        const key = normalize(bank);
+        bankCode = bankMap[key] || null;
+      }
+      if (!bankCode) {
+        return res.status(400).json({ error: 'Invalid settlement_bank. Provide bank 3-digit code or known bank name.' });
+      }
+
+      const paystackResponse = await axios.post(
+        'https://api.paystack.co/subaccount',
+        {
+          business_name: name,
+          settlement_bank: bankCode,
+          account_number: accountNumber,
+          percentage_charge: 10,
+          currency,
+          primary_contact_email: email,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      data = paystackResponse.data.data || {};
+      subaccount_code = data.subaccount_code;
+      if (!subaccount_code) throw new Error('No subaccount_code returned by Paystack');
+    } else {
+      if (process.env.ALLOW_SUBACCOUNT_MOCK === 'true') {
+        subaccount_code = `mock_${orgId}_${Date.now()}`;
+        data = { subaccount_code, mode: 'mock' };
+      } else {
+        return res.status(500).json({ error: 'Missing PAYSTACK_SECRET_KEY environment variable' });
+      }
+    }
 
     // 2. Store Subaccount in Firestore under subaccounts collection
     const sub = {

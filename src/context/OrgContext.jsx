@@ -260,17 +260,17 @@ export function OrgProvider({ children }) {
       
       // Method 1: EmailJS (preferred)
       if (
-        process.env.REACT_APP_EMAILJS_PUBLIC_KEY &&
-        process.env.REACT_APP_EMAILJS_SERVICE_ID &&
-        process.env.REACT_APP_EMAILJS_TEMPLATE_ID
+        (import.meta.env.REACT_APP_EMAILJS_PUBLIC_KEY || import.meta.env.VITE_EMAILJS_PUBLIC_KEY) &&
+        (import.meta.env.REACT_APP_EMAILJS_SERVICE_ID || import.meta.env.VITE_EMAILJS_SERVICE_ID) &&
+        (import.meta.env.REACT_APP_EMAILJS_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID)
       ) {
         try {
           const emailjs = await ensureEmailJs();
           if (emailjs && typeof emailjs.init === 'function') {
-            emailjs.init(process.env.REACT_APP_EMAILJS_PUBLIC_KEY);
+            emailjs.init(import.meta.env.REACT_APP_EMAILJS_PUBLIC_KEY || import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
             await emailjs.send(
-              process.env.REACT_APP_EMAILJS_SERVICE_ID,
-              process.env.REACT_APP_EMAILJS_TEMPLATE_ID,
+              (import.meta.env.REACT_APP_EMAILJS_SERVICE_ID || import.meta.env.VITE_EMAILJS_SERVICE_ID),
+              (import.meta.env.REACT_APP_EMAILJS_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID),
               {
                 to_email: inv.email,
                 org_name: safeOrgName(data?.name, activeOrgId),
@@ -291,7 +291,7 @@ export function OrgProvider({ children }) {
       }
       
       // Method 2: Fallback to Firebase Trigger Email
-      if (!emailSent && process.env.REACT_APP_USE_FIREBASE_TRIGGER_EMAIL === 'true') {
+      if (!emailSent && ((import.meta.env.REACT_APP_USE_FIREBASE_TRIGGER_EMAIL === 'true') || (import.meta.env.VITE_USE_FIREBASE_TRIGGER_EMAIL === 'true'))) {
         try {
           const mail = {
             to: [inv.email],
