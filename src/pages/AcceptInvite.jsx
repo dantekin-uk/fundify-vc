@@ -227,7 +227,7 @@ export default function AcceptInvite() {
 
         // send confirmation email with direct portal link (if mail trigger configured)
         try {
-          const portalLink = `${window.location.origin}/app/donor-dashboard/${funderObj.id}`;
+          const portalLink = `${window.location.origin}/donor/dashboard/${funderObj.id}`;
           const subject = `${orgName}: your funder portal is ready`;
           const mail = {
             to: [funderObj.email || invite?.email].filter(Boolean),

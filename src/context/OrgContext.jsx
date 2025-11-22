@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where, addDoc } from 'firebase/firestore';
+import { arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where, addDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 
@@ -248,6 +248,23 @@ export function OrgProvider({ children }) {
       // Add the new invite
       const nextInvites = [inv, ...invites];
       await updateDoc(ref, { invites: nextInvites });
+
+      // Also write a top-level invite doc for unauthenticated acceptance (publicly readable via rules)
+      try {
+        await setDoc(doc(db, 'invites', inv.token), {
+          id: inv.id,
+          token: inv.token,
+          email: inv.email,
+          role: inv.role,
+          orgId: activeOrgId,
+          organization: safeOrgName(data?.name, activeOrgId),
+          invitedBy: user?.email || 'an admin',
+          createdAt: inv.createdAt,
+          status: 'pending'
+        });
+      } catch (e) {
+        console.debug('set top-level invite failed', e?.message || e);
+      }
       
       // Generate the invitation link
       const link = `${window.location.origin}/invite/${activeOrgId}/${inv.token}`;
