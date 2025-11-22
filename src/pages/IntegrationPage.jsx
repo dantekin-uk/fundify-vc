@@ -6,7 +6,10 @@ import "@fontsource/inter";
 
 export default function IntegrationPage() {
   const { activeOrgId } = useOrg();
-  const API_BASE = (import.meta.env.VITE_SERVERLESS_BASE_URL || import.meta.env.VITE_API_BASE_URL || "").trim();
+  const API_BASE = (
+    (import.meta.env.VITE_SERVERLESS_BASE_URL || import.meta.env.VITE_API_BASE_URL || "") ||
+    (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' ? 'https://fundify-vc.vercel.app' : '')
+  ).trim();
   const [form, setForm] = useState({
     business_name: "",
     settlement_bank: "",
@@ -27,8 +30,9 @@ export default function IntegrationPage() {
         const res = await axios.get(url);
         setSubaccount(res.data?.subaccount ?? null);
       } catch (err) {
-        console.error("Error fetching subaccount:", err);
-        setError(err.response?.data?.message || "Failed to load integration details.");
+        const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to load integration details.";
+        console.error("Error fetching subaccount:", msg);
+        setError(msg);
       } finally {
         setLoading(false);
       }
@@ -48,7 +52,8 @@ export default function IntegrationPage() {
       const res = await axios.post(url, { orgId: activeOrgId, ...form });
       setSubaccount(res.data.subaccount);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create subaccount");
+      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Failed to create subaccount";
+      setError(msg);
     } finally {
       setLoading(false);
     }

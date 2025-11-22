@@ -320,7 +320,7 @@ export function FinanceProvider({ children }) {
       const list = (toList || []).filter(Boolean);
       if (!list.length) return;
 
-      const fnUrl = process.env.REACT_APP_EMAIL_FUNCTION_URL;
+      const fnUrl = import.meta.env.REACT_APP_EMAIL_FUNCTION_URL || import.meta.env.VITE_EMAIL_FUNCTION_URL;
       if (fnUrl) {
         try {
           await fetch(fnUrl, {
@@ -334,7 +334,7 @@ export function FinanceProvider({ children }) {
         }
       }
 
-      if (process.env.REACT_APP_USE_FIREBASE_TRIGGER_EMAIL === 'true') {
+      if ((import.meta.env.REACT_APP_USE_FIREBASE_TRIGGER_EMAIL === 'true') || (import.meta.env.VITE_USE_FIREBASE_TRIGGER_EMAIL === 'true')) {
         try {
           const text = html.replace(/<[^>]+>/g, ' ');
           await addDoc(collection(db, 'mail'), { to: list, message: { subject, text, html, vars } });
@@ -345,14 +345,14 @@ export function FinanceProvider({ children }) {
       }
 
       if (
-        process.env.REACT_APP_EMAILJS_PUBLIC_KEY &&
-        process.env.REACT_APP_EMAILJS_SERVICE_ID &&
-        process.env.REACT_APP_EMAILJS_TEMPLATE_ID
+        (import.meta.env.REACT_APP_EMAILJS_PUBLIC_KEY || import.meta.env.VITE_EMAILJS_PUBLIC_KEY) &&
+        (import.meta.env.REACT_APP_EMAILJS_SERVICE_ID || import.meta.env.VITE_EMAILJS_SERVICE_ID) &&
+        (import.meta.env.REACT_APP_EMAILJS_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID)
       ) {
         const emailjs = await ensureEmailJs();
         if (emailjs && typeof emailjs.init === 'function') {
-          emailjs.init(process.env.REACT_APP_EMAILJS_PUBLIC_KEY);
-          console.debug('EmailJS: sending template', process.env.REACT_APP_EMAILJS_TEMPLATE_ID, 'service', process.env.REACT_APP_EMAILJS_SERVICE_ID, 'to', list);
+          emailjs.init(import.meta.env.REACT_APP_EMAILJS_PUBLIC_KEY || import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
+          console.debug('EmailJS: sending template', (import.meta.env.REACT_APP_EMAILJS_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID), 'service', (import.meta.env.REACT_APP_EMAILJS_SERVICE_ID || import.meta.env.VITE_EMAILJS_SERVICE_ID), 'to', list);
           // ensure common template vars are present for EmailJS template editor
           const templateVars = {
             // prefer explicitly supplied vars, otherwise derive
@@ -374,8 +374,8 @@ export function FinanceProvider({ children }) {
           const results = await Promise.all(
             list.map((to) =>
               emailjs.send(
-                process.env.REACT_APP_EMAILJS_SERVICE_ID,
-                process.env.REACT_APP_EMAILJS_TEMPLATE_ID,
+                (import.meta.env.REACT_APP_EMAILJS_SERVICE_ID || import.meta.env.VITE_EMAILJS_SERVICE_ID),
+                (import.meta.env.REACT_APP_EMAILJS_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID),
                 { to_email: to, ...templateVars }
               )
             )

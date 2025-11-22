@@ -20,11 +20,16 @@ export default async function handler(req, res) {
   }
 
   const secret = process.env.PAYSTACK_SECRET_KEY;
-  const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
-
-  if (hash !== req.headers['x-paystack-signature']) {
-    console.error('Invalid Paystack signature');
-    return res.status(401).json({ error: 'Unauthorized: Invalid signature' });
+  const allowMock = (process.env.ALLOW_PAYMENT_MOCK === 'true') || (process.env.ALLOW_SUBACCOUNT_MOCK === 'true');
+  if (!secret && !allowMock) {
+    return res.status(500).json({ error: 'Missing PAYSTACK_SECRET_KEY environment variable' });
+  }
+  if (secret) {
+    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+    if (hash !== req.headers['x-paystack-signature']) {
+      console.error('Invalid Paystack signature');
+      return res.status(401).json({ error: 'Unauthorized: Invalid signature' });
+    }
   }
 
   const event = req.body;
@@ -74,7 +79,7 @@ export default async function handler(req, res) {
       t.update(orgRef, { incomes });
     });
 
-    console.log(`Successfully processed transaction: ${reference} for NGO: ${ngoId}`);
+    console.log(`Successfully processed transaction: ${reference} for Org: ${orgId}`);
     return res.status(200).json({ message: 'Webhook processed successfully' });
 
   } catch (error) {
