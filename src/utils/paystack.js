@@ -19,7 +19,7 @@ function loadScript() {
   return scriptLoading;
 }
 
-export async function openPaystack({ key, email, amount, currency = 'KES', reference, metadata = {}, subaccount, onSuccess, onCancel }) {
+export async function openPaystack({ key, email, amount, currency = 'NGN', reference, metadata = {}, subaccount, onSuccess, onCancel }) {
   const PaystackPop = await loadScript();
   if (!PaystackPop) throw new Error('Paystack not available');
 
@@ -32,7 +32,7 @@ export async function openPaystack({ key, email, amount, currency = 'KES', refer
     key,
     email,
     amount: koboAmount,
-    currency: currency || 'KES',
+    currency: currency || 'NGN',
     subaccount: subaccount,
     ref: reference,
     metadata,

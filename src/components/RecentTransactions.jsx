@@ -117,7 +117,7 @@ const RecentTransactions = ({ limit = 8 }) => {
               <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                 <div className="text-right">
                   <div className={`text-sm font-semibold ${tx.type === 'income' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                    {tx.type === 'income' ? '+' : '-'}{formatAmount(tx.amount, currency)}
+                    {tx.type === 'income' ? '+' : '-'}{formatAmount(tx.amount, tx.currency || currency)}
                   </div>
                   <div className="text-xs text-gray-600 dark:text-slate-400">
                     {formatDate(tx.date)}

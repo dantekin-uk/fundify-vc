@@ -59,12 +59,17 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
         return;
       }
 
+      // Determine Paystack-supported currency (fallback to NGN if unsupported)
+      const supported = ['NGN','GHS','ZAR','USD'];
+      const desired = String(orgCurrency || 'NGN').toUpperCase();
+      const paystackCurrency = supported.includes(desired) ? desired : 'NGN';
+
       // Open Paystack payment modal with complete metadata and subaccount routing
       await openPaystack({
         key: (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.REACT_APP_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY),
         email: user?.email || '',
         amount: amountValue * 100, // Convert to kobo (Paystack uses kobo)
-        currency: orgCurrency || 'KES',
+        currency: paystackCurrency,
         reference,
         metadata: {
           orgId: activeOrgId,
@@ -73,7 +78,8 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
           userId: user?.uid,
           email: user?.email,
           name: user?.displayName || 'Anonymous Donor',
-          description: `Contribution from ${user?.displayName || user?.email}`
+          description: `Contribution from ${user?.displayName || user?.email}`,
+          display_currency: desired
         },
         subaccount: subaccountCode,
         onSuccess: async (response) => {
