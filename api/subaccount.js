@@ -51,10 +51,19 @@ export default async function handler(req, res) {
     const db = ensureDb();
     const subaccountRef = db.collection('subaccounts').where('org_id', '==', orgId);
     const snapshot = await subaccountRef.get();
-    if (snapshot.empty) {
+    let subaccount = null;
+    if (!snapshot.empty) {
+      subaccount = snapshot.docs[0].data();
+    } else {
+      // Fallback: try direct doc lookup by orgId
+      const directDoc = await db.collection('subaccounts').doc(orgId).get();
+      if (directDoc.exists) {
+        subaccount = directDoc.data();
+      }
+    }
+    if (!subaccount) {
       return res.status(404).json({ message: 'Subaccount not found' });
     }
-    const subaccount = snapshot.docs[0].data();
     res.status(200).json({ subaccount });
   } catch (error) {
     res.status(500).json({ message: 'An internal server error occurred.', error: error.message });

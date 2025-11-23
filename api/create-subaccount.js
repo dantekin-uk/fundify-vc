@@ -79,7 +79,8 @@ export default async function handler(req, res) {
         'WEMA': '035', 'WEMA BANK': '035'
       };
       let bankCode = String(bank || '').trim();
-      if (!/^[0-9]{3}$/.test(bankCode)) {
+      // Accept standard 3-digit codes and Paystack alpha-suffixed codes like "035A"
+      if (!/^[0-9]{3}[A-Za-z]?$/.test(bankCode)) {
         const key = normalize(bank);
         bankCode = bankMap[key] || null;
       }
@@ -127,6 +128,7 @@ export default async function handler(req, res) {
       contact_email: email,
       created_at: new Date().toISOString(),
       details: data,
+      active: true,
     };
     await db.collection('subaccounts').doc(`${orgId}`).set(sub, { merge: true });
 
