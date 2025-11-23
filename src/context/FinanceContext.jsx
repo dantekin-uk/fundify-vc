@@ -52,6 +52,27 @@ export function FinanceProvider({ children }) {
     }
   }, [activeOrgId]);
 
+  // Subscribe to active org doc for realtime updates (incomes, expenses, funders, projects, logs, invites)
+  useEffect(() => {
+    if (!activeOrgId) return;
+    const ref = doc(db, 'orgs', activeOrgId);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      setState({
+        funders: Array.isArray(data.funders) ? data.funders : [],
+        projects: Array.isArray(data.projects) ? data.projects : [],
+        incomes: Array.isArray(data.incomes) ? data.incomes : [],
+        expenses: Array.isArray(data.expenses) ? data.expenses : [],
+        logs: Array.isArray(data.logs) ? data.logs : [],
+        invites: Array.isArray(data.invites) ? data.invites : [],
+      });
+    }, (err) => {
+      console.debug('Realtime org subscription failed', err?.message || err);
+    });
+    return () => unsub();
+  }, [activeOrgId]);
+
   // Persist locally whenever state changes (still useful for offline)
   useEffect(() => {
     try {

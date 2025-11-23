@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { openPaystack } from '../utils/paystack';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useFinance } from '../context/FinanceContext';
 import { useOrg } from '../context/OrgContext';
@@ -41,7 +43,23 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
       // Generate a unique reference
       const reference = `DONATION_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Open Paystack payment modal with complete metadata
+      // Lookup organization's Paystack subaccount
+      let subaccountCode = null;
+      try {
+        const subRef = doc(db, 'subaccounts', activeOrgId);
+        const subSnap = await getDoc(subRef);
+        if (subSnap.exists()) {
+          subaccountCode = subSnap.data()?.paystack_subaccount_id || null;
+        }
+      } catch {}
+
+      if (!subaccountCode) {
+        setError('Payment subaccount not set for this organization. Please ask the admin to create it in Integration.');
+        setLoading(false);
+        return;
+      }
+
+      // Open Paystack payment modal with complete metadata and subaccount routing
       await openPaystack({
         key: (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.REACT_APP_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY),
         email: user?.email || '',
@@ -57,6 +75,7 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
           name: user?.displayName || 'Anonymous Donor',
           description: `Contribution from ${user?.displayName || user?.email}`
         },
+        subaccount: subaccountCode,
         onSuccess: async (response) => {
           console.log('Payment successful:', response);
           // The webhook will handle the actual database updates
