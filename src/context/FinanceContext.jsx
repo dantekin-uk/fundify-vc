@@ -59,8 +59,21 @@ export function FinanceProvider({ children }) {
     const unsub = onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
+      const dedupFunders = (arr) => {
+        const out = [];
+        const seen = new Set();
+        (Array.isArray(arr) ? arr : []).forEach((f) => {
+          if (!f) return;
+          const key = String(f.id || '').trim().toLowerCase() || String(f.email || '').trim().toLowerCase();
+          if (!key) { out.push(f); return; }
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push(f);
+        });
+        return out;
+      };
       setState({
-        funders: Array.isArray(data.funders) ? data.funders : [],
+        funders: dedupFunders(data.funders),
         projects: Array.isArray(data.projects) ? data.projects : [],
         incomes: Array.isArray(data.incomes) ? data.incomes : [],
         expenses: Array.isArray(data.expenses) ? data.expenses : [],
@@ -181,8 +194,21 @@ export function FinanceProvider({ children }) {
     const unsub = onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
+      const dedupFunders = (arr) => {
+        const out = [];
+        const seen = new Set();
+        (Array.isArray(arr) ? arr : []).forEach((f) => {
+          if (!f) return;
+          const key = String(f.id || '').trim().toLowerCase() || String(f.email || '').trim().toLowerCase();
+          if (!key) { out.push(f); return; }
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push(f);
+        });
+        return out;
+      };
       setState({
-        funders: Array.isArray(data.funders) ? normalizeArray(data.funders) : [],
+        funders: dedupFunders(normalizeArray(data.funders)),
         projects: normalizeArray(data.projects || []),
         incomes: normalizeArray(data.incomes || []),
         expenses: normalizeArray(data.expenses || []),

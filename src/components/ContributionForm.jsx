@@ -53,6 +53,30 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
         }
       } catch {}
 
+      // Fallback: query serverless API if Firestore doc is missing
+      if (!subaccountCode) {
+        try {
+          const API_BASE = (
+            (import.meta.env.VITE_SERVERLESS_BASE_URL || import.meta.env.VITE_API_BASE_URL || "") ||
+            (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' ? 'https://fundify-vc.vercel.app' : '')
+          ).trim();
+          const url = API_BASE ? `${API_BASE}/api/subaccount?orgId=${activeOrgId}` : `/api/subaccount?orgId=${activeOrgId}`;
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const json = await resp.json();
+            const sub = json?.subaccount;
+            subaccountCode = sub?.paystack_subaccount_id || null;
+            // cache locally in Firestore for next time
+            if (subaccountCode && sub) {
+              try { await window?.localStorage?.setItem?.('subaccount_cache_'+activeOrgId, subaccountCode); } catch {}
+              try { await (await import('firebase/firestore')).setDoc(doc(db, 'subaccounts', activeOrgId), sub, { merge: true }); } catch {}
+            }
+          }
+        } catch (apiErr) {
+          // ignore; will show friendly error below
+        }
+      }
+
       if (!subaccountCode) {
         setError('Payment subaccount not set for this organization. Please ask the admin to create it in Integration.');
         setLoading(false);

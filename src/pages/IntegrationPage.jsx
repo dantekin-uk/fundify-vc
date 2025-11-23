@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useOrg } from "../context/OrgContext";
 // Modern Inter font
 import "@fontsource/inter";
@@ -50,7 +52,17 @@ export default function IntegrationPage() {
       // Call Vercel serverless function for subaccount creation
       const url = API_BASE ? `${API_BASE}/api/create-subaccount` : "/api/create-subaccount";
       const res = await axios.post(url, { orgId: activeOrgId, ...form });
-      setSubaccount(res.data.subaccount);
+      const sub = res.data.subaccount;
+      setSubaccount(sub);
+      // Client fallback: persist the subaccount to Firestore in case the serverless write failed
+      try {
+        if (sub && activeOrgId) {
+          await setDoc(doc(db, 'subaccounts', activeOrgId), sub, { merge: true });
+        }
+      } catch (persistErr) {
+        // non-fatal
+        console.debug('Client fallback persist subaccount failed', persistErr?.message || persistErr);
+      }
     } catch (err) {
       const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Failed to create subaccount";
       setError(msg);
