@@ -46,6 +46,10 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
       // Lookup organization's Paystack subaccount
       let subaccountCode = null;
       try {
+        const cached = window?.localStorage?.getItem?.('subaccount_cache_'+activeOrgId);
+        if (cached) subaccountCode = cached;
+      } catch {}
+      try {
         const subRef = doc(db, 'subaccounts', activeOrgId);
         const subSnap = await getDoc(subRef);
         if (subSnap.exists()) {
@@ -77,7 +81,8 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
         }
       }
 
-      if (!subaccountCode) {
+      const allowNoSub = (import.meta.env.VITE_ALLOW_PAYMENT_WITHOUT_SUBACCOUNT === 'true') || (import.meta.env.REACT_APP_ALLOW_PAYMENT_WITHOUT_SUBACCOUNT === 'true');
+      if (!subaccountCode && !allowNoSub) {
         setError('Payment subaccount not set for this organization. Please ask the admin to create it in Integration.');
         setLoading(false);
         return;
@@ -105,7 +110,7 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
           description: `Contribution from ${user?.displayName || user?.email}`,
           display_currency: desired
         },
-        subaccount: subaccountCode,
+        subaccount: subaccountCode || undefined,
         onSuccess: async (response) => {
           console.log('Payment successful:', response);
           // The webhook will handle the actual database updates
