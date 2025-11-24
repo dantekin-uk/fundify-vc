@@ -98,10 +98,22 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
       const forceNGN = (import.meta.env.VITE_PAYSTACK_FORCE_NGN === 'true') || (import.meta.env.REACT_APP_PAYSTACK_FORCE_NGN === 'true');
       const subCur = supported.includes(String(subCurrency)) ? String(subCurrency) : null;
       const paystackCurrency = forceNGN ? 'NGN' : (subCur || (supported.includes(desired) ? desired : 'NGN'));
+      // Enforce minimum amount of 1 unit to avoid 400 from Paystack
+      if (amountValue < 1) {
+        setError(`Minimum amount is 1 ${paystackCurrency}`);
+        setLoading(false);
+        return;
+      }
 
       // Open Paystack payment modal with complete metadata and subaccount routing
+      const publicKey = (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.REACT_APP_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY);
+      if (!publicKey || !String(publicKey).startsWith('pk_')) {
+        setError('Invalid Paystack public key. Please configure VITE_PAYSTACK_PUBLIC_KEY.');
+        setLoading(false);
+        return;
+      }
       await openPaystack({
-        key: (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.REACT_APP_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY),
+        key: publicKey,
         email: user?.email || '',
         amount: amountValue * 100, // Convert to kobo (Paystack uses kobo)
         currency: paystackCurrency,
