@@ -52,7 +52,7 @@ export function FinanceProvider({ children }) {
     }
   }, [activeOrgId]);
 
-  // Subscribe to active org doc for realtime updates (incomes, expenses, funders, projects, logs, invites)
+  
   useEffect(() => {
     if (!activeOrgId) return;
     const ref = doc(db, 'orgs', activeOrgId);
@@ -1090,22 +1090,29 @@ export function FinanceProvider({ children }) {
 
   // Add a funder
   const addFunder = async (funder) => {
+    const baseId = String(funder?.id || funder?.userId || funder?.email || `f-${uid()}`);
     const newFunder = {
-      id: `funder-${Date.now()}`,
       ...funder,
+      id: baseId,
       createdAt: new Date().toISOString(),
-      status: 'active'
+      status: funder?.status || 'active'
     };
-    
-    const updatedFunders = [...state.funders, newFunder];
-    
-    setState(s => ({
-      ...s,
-      funders: updatedFunders
-    }));
-    
+    const prev = Array.isArray(state.funders) ? state.funders : [];
+    const nid = String(newFunder.id || '').trim().toLowerCase();
+    const nem = String(newFunder.email || '').trim().toLowerCase();
+    const updatedFunders = [
+      ...prev.filter((f) => {
+        const fid = String(f?.id || '').trim().toLowerCase();
+        const fem = String(f?.email || '').trim().toLowerCase();
+        if (nid && fid && fid === nid) return false;
+        if (nem && fem && fem === nem) return false;
+        return true;
+      }),
+      newFunder,
+    ];
+    setState((s) => ({ ...s, funders: updatedFunders }));
     await syncToFirestore('funders', updatedFunders);
-    return newFunder.id; // Return the new funder's ID
+    return newFunder.id;
   };
 
   // Explicit refresh function for payment webhooks and other async operations
@@ -1116,8 +1123,21 @@ export function FinanceProvider({ children }) {
       const snap = await getDoc(ref);
       if (snap.exists()) {
         const data = snap.data();
+        const dedupFunders = (arr) => {
+          const out = [];
+          const seen = new Set();
+          (Array.isArray(arr) ? arr : []).forEach((f) => {
+            if (!f) return;
+            const key = String(f.id || '').trim().toLowerCase() || String(f.email || '').trim().toLowerCase();
+            if (!key) { out.push(f); return; }
+            if (seen.has(key)) return;
+            seen.add(key);
+            out.push(f);
+          });
+          return out;
+        };
         setState({
-          funders: Array.isArray(data.funders) ? data.funders : [],
+          funders: dedupFunders(data.funders),
           projects: Array.isArray(data.projects) ? data.projects : [],
           incomes: Array.isArray(data.incomes) ? data.incomes : [],
           expenses: Array.isArray(data.expenses) ? data.expenses : [],

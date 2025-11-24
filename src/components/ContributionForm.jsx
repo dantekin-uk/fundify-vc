@@ -45,6 +45,7 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
 
       // Lookup organization's Paystack subaccount
       let subaccountCode = null;
+      let subCurrency = null;
       try {
         const cached = window?.localStorage?.getItem?.('subaccount_cache_'+activeOrgId);
         if (cached) subaccountCode = cached;
@@ -53,7 +54,9 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
         const subRef = doc(db, 'subaccounts', activeOrgId);
         const subSnap = await getDoc(subRef);
         if (subSnap.exists()) {
-          subaccountCode = subSnap.data()?.paystack_subaccount_id || null;
+          const d = subSnap.data();
+          subaccountCode = d?.paystack_subaccount_id || null;
+          subCurrency = String(d?.currency || '').toUpperCase() || null;
         }
       } catch {}
 
@@ -70,6 +73,7 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
             const json = await resp.json();
             const sub = json?.subaccount;
             subaccountCode = sub?.paystack_subaccount_id || null;
+            subCurrency = String(sub?.currency || '').toUpperCase() || null;
             // cache locally in Firestore for next time
             if (subaccountCode && sub) {
               try { await window?.localStorage?.setItem?.('subaccount_cache_'+activeOrgId, subaccountCode); } catch {}
@@ -91,7 +95,9 @@ const ContributionForm = ({ onSuccess, onClose, funderId }) => {
       // Determine Paystack-supported currency (fallback to NGN if unsupported)
       const supported = ['NGN','GHS','ZAR','USD'];
       const desired = String(orgCurrency || 'NGN').toUpperCase();
-      const paystackCurrency = supported.includes(desired) ? desired : 'NGN';
+      const forceNGN = (import.meta.env.VITE_PAYSTACK_FORCE_NGN === 'true') || (import.meta.env.REACT_APP_PAYSTACK_FORCE_NGN === 'true');
+      const subCur = supported.includes(String(subCurrency)) ? String(subCurrency) : null;
+      const paystackCurrency = forceNGN ? 'NGN' : (subCur || (supported.includes(desired) ? desired : 'NGN'));
 
       // Open Paystack payment modal with complete metadata and subaccount routing
       await openPaystack({
