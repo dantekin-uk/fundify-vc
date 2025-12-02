@@ -11,7 +11,7 @@ export function useFinancialInsight(type, dataContext) {
 
       // Try to get cached insight first
       const cached = getCachedInsight(cacheKey);
-      if (cached) {
+      if (cached && typeof cached === 'string') {
         setInsight(cached);
         return;
       }
@@ -24,12 +24,16 @@ export function useFinancialInsight(type, dataContext) {
           ...dataContext,
         });
 
-        if (newInsight) {
-          setInsight(newInsight);
-          setCachedInsight(cacheKey, newInsight);
+        // Only set insight if it's a valid string
+        if (newInsight && typeof newInsight === 'string' && newInsight.trim()) {
+          setInsight(newInsight.trim());
+          setCachedInsight(cacheKey, newInsight.trim());
+        } else {
+          setInsight('');
         }
       } catch (error) {
         console.error('Failed to generate insight:', error);
+        setInsight('');
       } finally {
         setLoading(false);
       }

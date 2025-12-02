@@ -1,7 +1,5 @@
 const API_PATH = '/api/ai/insight';
 
-// DeepSeek only
-
 export async function generateInsight(dataContext) {
   try {
     const type = dataContext?.type || 'insight';
@@ -16,15 +14,38 @@ export async function generateInsight(dataContext) {
       totalIncome: dataContext?.totalIncome,
       totalExpenses: dataContext?.totalExpenses,
     };
-    const res = await fetch(API_PATH, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, metrics })
-    });
-    if (!res.ok) return null;
-    const json = await res.json().catch(() => null);
-    const summary = json?.insight?.summary || null;
-    return summary || null;
+
+    // Attempt to fetch AI insight from API
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const res = await fetch(API_PATH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, metrics }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json && typeof json === 'object') {
+          const summary = json?.insight?.summary;
+          // Ensure we always return a string or null, never an object
+          if (typeof summary === 'string' && summary.trim()) {
+            return summary.trim();
+          }
+        }
+      }
+    } catch (fetchError) {
+      // API endpoint not available or timeout - silently continue without AI insight
+      console.debug('AI insight API unavailable:', fetchError?.message || fetchError);
+    }
+
+    // Return null if API fails - component will handle gracefully
+    return null;
   } catch (error) {
     console.error('Error generating insight:', error);
     return null;

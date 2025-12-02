@@ -318,7 +318,7 @@ export default function StatCard({
                   <span className="opacity-70">Generating insight...</span>
                 </div>
               ) : (
-                insight
+                typeof insight === 'string' ? insight : null
               )}
             </div>
           )}
