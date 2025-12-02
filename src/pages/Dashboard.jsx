@@ -29,8 +29,46 @@ const Dashboard = () => {
     fundingRows = { rows: [] },
     byFunder = [],
     byProject = [],
-    seriesMap = {}
+    seriesMap = {},
+    expenses = [],
+    incomes = [],
   } = useFinance();
+
+  // Compute insight data
+  const expenseMap = expenses
+    .filter(e => e.status === 'posted')
+    .reduce((acc, e) => {
+      const existing = acc.get(e.category) || 0;
+      acc.set(e.category, existing + e.amount);
+      return acc;
+    }, new Map());
+
+  const topExpenseCategories = Array.from(expenseMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([cat]) => cat);
+
+  const topExpenseCategory = topExpenseCategories[0] || 'N/A';
+
+  const incomeBySource = incomes
+    .filter(i => i.status === 'posted')
+    .reduce((acc, i) => {
+      const source = i.projectId ? 'Project' : 'Donor';
+      acc[source] = (acc[source] || 0) + i.amount;
+      return acc;
+    }, {});
+
+  const topIncomeSource = Object.keys(incomeBySource).length > 0
+    ? Object.entries(incomeBySource).sort((a, b) => b[1] - a[1])[0][0]
+    : 'N/A';
+
+  const totalIncomeAmount = incomes
+    .filter(i => i.status === 'posted')
+    .reduce((sum, i) => sum + i.amount, 0);
+
+  const totalExpensesAmount = expenses
+    .filter(e => e.status === 'posted')
+    .reduce((sum, e) => sum + e.amount, 0);
 
   const active = (tab) => window.location.pathname.includes(`/app/dashboard/${tab}`);
   const defaultPayment = paymentMethods.find(m => m.isDefault) || paymentMethods[0] || null;
@@ -136,10 +174,9 @@ const Dashboard = () => {
               </div>
 
               {/* Stats Card - Right Side (2 columns) */}
-              <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 p-8 ring-1 ring-gray-200 dark:ring-slate-700 shadow-lg hover:shadow-xl transition-shadow duration-300 min-w-0">
-                {/* Removed Financial Overview header and description */}
-                <div className="grid grid-cols-2 gap-5">
-                  {stats.slice(0, 4).map((s) => (
+              <div className="lg:col-span-2 min-w-0">
+                <div className="grid grid-cols-2 gap-6">
+                  {stats.slice(0, 3).map((s) => (
                     <StatCard
                       key={s.name}
                       title={s.name}
@@ -147,6 +184,12 @@ const Dashboard = () => {
                       rawValue={s.raw}
                       variant={s.variant}
                       series={seriesMap[s.name]}
+                      currency={currency}
+                      topExpenseCategories={topExpenseCategories}
+                      topIncomeSource={topIncomeSource}
+                      topExpenseCategory={topExpenseCategory}
+                      totalIncome={totalIncomeAmount}
+                      totalExpenses={totalExpensesAmount}
                     />
                   ))}
                 </div>
@@ -167,25 +210,10 @@ const Dashboard = () => {
                 </Link>
               </div>
 
-              {/* Stats Grid - Full Width (4 columns) */}
-              <div
-                className="rounded-2xl bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 p-8 ring-1 ring-gray-200 dark:ring-slate-700 shadow-lg min-w-0 relative"
-                style={{ overflow: 'hidden' }}
-              >
-                {/* Bluish glowing background in top-right corner */}
-                <div
-                  className="absolute top-0 right-0 pointer-events-none"
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: '50%',
-                    background: 'radial-gradient(circle, #2563eb55 0%, #2563eb00 80%)',
-                    filter: 'blur(16px)',
-                    zIndex: 0
-                  }}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 relative z-10">
-                  {stats.slice(0, 4).map((s) => (
+              {/* Stats Grid - Full Width (3 columns) */}
+              <div className="min-w-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {stats.slice(0, 3).map((s) => (
                     <StatCard
                       key={s.name}
                       title={s.name}
@@ -193,6 +221,12 @@ const Dashboard = () => {
                       rawValue={s.raw}
                       variant={s.variant}
                       series={seriesMap[s.name]}
+                      currency={currency}
+                      topExpenseCategories={topExpenseCategories}
+                      topIncomeSource={topIncomeSource}
+                      topExpenseCategory={topExpenseCategory}
+                      totalIncome={totalIncomeAmount}
+                      totalExpenses={totalExpensesAmount}
                     />
                   ))}
                 </div>

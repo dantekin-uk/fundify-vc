@@ -44,6 +44,7 @@ import DonorHomeRedirect from './pages/DonorHomeRedirect';
 import DonorPaymentSuccess from './pages/DonorPaymentSuccess';
 import DonorPaymentCancel from './pages/DonorPaymentCancel';
 import IntegrationPage from './pages/IntegrationPage';
+import AiInsightsDemo from './pages/demo/AiInsightsDemo';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -153,6 +154,7 @@ function AppContent() {
         } />
         {/* Optional alias */}
         <Route path="/home" element={<Navigate to="/" replace />} />
+        <Route path="/demo/ai-insights" element={<AiInsightsDemo />} />
         <Route path="/invite/:orgId/:token" element={<InvitationRoute><AcceptInvite /></InvitationRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/forgot" element={<PublicRoute><ForgotPassword /></PublicRoute>} />

@@ -1074,12 +1074,11 @@ export function FinanceProvider({ children }) {
 
   const stats = useMemo(() => {
     return [
-      { name: 'Total Funds', raw: totals.totalIncome, value: formatAmount(totals.totalIncome, orgCurrency), variant: 'funds' },
-      { name: 'Total Expenses', raw: totals.totalExpenses, value: formatAmount(totals.totalExpenses, orgCurrency), variant: 'expenses' },
-      { name: 'Net Available', raw: totals.totalAvailable, value: formatAmount(totals.totalAvailable, orgCurrency), variant: 'balance' },
-      { name: 'Budget', raw: sumAllocations, value: formatAmount(sumAllocations, orgCurrency), variant: 'budget' },
+      { name: 'Income', raw: totals.totalIncome, value: formatAmount(totals.totalIncome, orgCurrency), variant: 'income' },
+      { name: 'Expenses', raw: totals.totalExpenses, value: formatAmount(totals.totalExpenses, orgCurrency), variant: 'expenses' },
+      { name: 'Balance', raw: totals.totalAvailable, value: formatAmount(totals.totalAvailable, orgCurrency), variant: 'balance' },
     ];
-  }, [totals, sumAllocations, orgCurrency]);
+  }, [totals, orgCurrency]);
 
   const fundingRows = useMemo(() => {
     const rows = Array.isArray(byFunder) ? byFunder.map((r) => ({ ...r })) : [];
@@ -1156,15 +1155,27 @@ export function FinanceProvider({ children }) {
     // creators
     addProject,
     addIncome,
+    addExpense,
     addFunder,
     sendInvitation,
     appendLog,
     inviteFunder,
     refreshData,
+    // approvals and management
+    approveExpense,
+    rejectExpense,
+    approveIncome,
+    rejectIncome,
+    postPendingExpense,
+    removeItem,
+    softRemoveLog,
+    restoreLog,
+    finalizeRemoveLog,
     logs: state.logs || [],
     // Other existing context values...
     stats,
     fundingRows,
+    wallets,
     byFunder, // Use the memoized byFunder value directly
     byProject, // expose computed byProject
     seriesMap // expose computed seriesMap
@@ -1172,13 +1183,24 @@ export function FinanceProvider({ children }) {
     state,
     addProject,
     addIncome,
+    addExpense,
     addFunder,
     sendInvitation,
     appendLog,
     inviteFunder,
     refreshData,
+    approveExpense,
+    rejectExpense,
+    approveIncome,
+    rejectIncome,
+    postPendingExpense,
+    removeItem,
+    softRemoveLog,
+    restoreLog,
+    finalizeRemoveLog,
     stats,
     fundingRows,
+    wallets,
     byFunder,
     byProject
   ]);

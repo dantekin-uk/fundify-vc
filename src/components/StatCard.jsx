@@ -9,6 +9,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { useTheme } from '../context/ThemeContext';
+import { useFinancialInsight } from '../hooks/useFinancialInsight';
 
 /* --------------------------------------------------------
    CONFIG
@@ -33,10 +34,18 @@ export default function StatCard({
   series = [],
   variant = 'funds',
   className = '',
+  rawValue = 0,
+  currency = 'USD',
+  topExpenseCategories = [],
+  topIncomeSource = 'N/A',
+  topExpenseCategory = 'N/A',
+  totalIncome = 0,
+  totalExpenses = 0,
 }) {
   const { isDark } = useTheme();
   const Icon = ICONS[variant] || CurrencyDollarIcon;
   const gradientId = useMemo(() => `stat-grad-${variant}-${String(title)}`.replace(/[^a-z0-9-_]/gi, '-'), [variant, title]);
+
   // Icon colors per variant
   const iconColors = {
     funds: "#2563eb",      // blue
@@ -54,6 +63,7 @@ export default function StatCard({
 
   // timeframe: W (7d), M (30d), Y (365d)
   const [range, setRange] = useState('W');
+  const [showRangeMenu, setShowRangeMenu] = useState(false);
   const days = range === 'W' ? 7 : range === 'M' ? 30 : 365;
 
   // normalize incoming series keys to { value, label }
@@ -77,6 +87,21 @@ export default function StatCard({
     const b = Number(data[data.length - 1]?.value ?? 0);
     return a ? ((b - a) / Math.abs(a)) * 100 : 0;
   }, [data]);
+
+  // Prepare data context for AI insight
+  const insightContext = useMemo(() => ({
+    amount: rawValue,
+    currency,
+    trend: pct,
+    topCategory: variant === 'expenses' ? topExpenseCategory : topIncomeSource,
+    periodChangePercent: Math.round(pct),
+    totalIncome,
+    totalExpenses,
+    topExpenseCategories,
+  }), [rawValue, currency, pct, variant, topExpenseCategory, topIncomeSource, totalIncome, totalExpenses, topExpenseCategories]);
+
+  // Get AI insight
+  const { insight, loading: insightLoading } = useFinancialInsight(variant, insightContext);
 
   const lastText = useMemo(() => {
     if (!data || data.length === 0) return '';
@@ -107,71 +132,126 @@ export default function StatCard({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 shadow-md transition-all duration-300 ${className}`}
+      className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br shadow-lg transition-all duration-300 ${className}`}
       style={{
-        minHeight: 96,
+        minHeight: 260,
         padding: 0,
-        boxShadow: '0 2px 12px 0 rgba(0,0,0,0.06)',
+        boxShadow: '0 4px 20px 0 rgba(0,0,0,0.08)',
         cursor: 'pointer',
+        background: isDark
+          ? `linear-gradient(135deg, #1e293b 0%, #0f172a 100%)`
+          : `linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)`,
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = '0 6px 24px 0 rgba(37,99,235,0.12)';
-        e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)';
-        e.currentTarget.style.borderColor = '#2563eb';
+        e.currentTarget.style.boxShadow = '0 8px 32px 0 rgba(37,99,235,0.16)';
+        e.currentTarget.style.transform = 'translateY(-4px)';
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.boxShadow = '0 2px 12px 0 rgba(0,0,0,0.06)';
+        e.currentTarget.style.boxShadow = '0 4px 20px 0 rgba(0,0,0,0.08)';
         e.currentTarget.style.transform = 'none';
-        e.currentTarget.style.borderColor = isDark ? '#334155' : '#d1d5db';
       }}
     >
-      <div className="relative p-3 sm:p-4 flex flex-col min-h-[96px]">
-        {/* header */}
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-800 shadow-sm"
-            style={{
-              background: isDark ? "#1e293b" : "#f8fafc"
-            }}
-          >
-            <Icon className="h-4 w-4 opacity-90" style={{ color: iconColors[variant] || "#2563eb" }} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wide truncate font-semibold" style={{ color: nameColor }}>
-              {title}
-            </p>
-            <p
-              className="mt-0.5 font-bold whitespace-nowrap overflow-hidden text-ellipsis text-[2rem]"
-              title={String(value)}
+
+      <div className="relative p-6 sm:p-8 flex flex-col justify-between min-h-[260px]">
+        {/* Top Header: Icon + Title (left) and Timeframe Dropdown (right) */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div
+              className="h-8 w-8 flex items-center justify-center rounded-lg flex-shrink-0"
               style={{
-                color: isDark ? "#fff" : "#1e293b",
-                fontWeight: 700,
-                letterSpacing: '0.01em'
+                background: `${iconColors[variant] || "#2563eb"}15`,
               }}
             >
-              {value}
+              <Icon className="h-5 w-5" style={{ color: iconColors[variant] || "#2563eb" }} />
+            </div>
+            <p className="text-xs uppercase tracking-widest font-semibold opacity-70 truncate" style={{ color: iconColors[variant] || "#2563eb" }}>
+              {title}
             </p>
+          </div>
+
+          {/* Timeframe Dropdown Selector */}
+          <div className="relative ml-2 flex-shrink-0">
+            <button
+              onClick={() => setShowRangeMenu(!showRangeMenu)}
+              className="h-9 w-9 flex items-center justify-center rounded-full font-semibold text-xs transition-all shadow-sm"
+              style={{
+                background: isDark ? "rgba(0,0,0,0.3)" : "#e8f4f8",
+                color: isDark ? "#cbd5e1" : iconColors[variant] || "#2563eb",
+                border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : (iconColors[variant] || "#2563eb") + "30"}`,
+              }}
+              title="Select time range"
+            >
+              {range}
+            </button>
+            {showRangeMenu && (
+              <div
+                className="absolute top-full right-0 mt-2 rounded-lg shadow-xl z-10 min-w-max"
+                style={{
+                  background: isDark ? "#1e293b" : "#fff",
+                  border: `1.5px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                {['W', 'M', 'Y'].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setRange(r);
+                      setShowRangeMenu(false);
+                    }}
+                    className={`block w-full text-left px-4 py-2 text-sm font-medium transition-colors ${
+                      r === 'W' ? 'rounded-t-lg' : ''
+                    } ${r === 'Y' ? 'rounded-b-lg' : ''}`}
+                    style={{
+                      color: range === r ? (iconColors[variant] || "#2563eb") : (isDark ? "#cbd5e1" : "#64748b"),
+                      background: range === r ? (isDark ? "rgba(5,150,105,0.15)" : "rgba(5,150,105,0.1)") : "transparent",
+                    }}
+                  >
+                    {r === 'W' ? 'Week (7d)' : r === 'M' ? 'Month (30d)' : 'Year (365d)'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* spark-line */}
+        {/* Amount */}
+        <div className="mb-4">
+          <p
+            className="font-bold overflow-hidden text-ellipsis text-2xl sm:text-3xl"
+            title={String(value)}
+            style={{
+              color: isDark ? "#fff" : "#1e293b",
+              fontWeight: 800,
+              letterSpacing: '-0.01em',
+              wordBreak: 'break-word'
+            }}
+          >
+            {value}
+          </p>
+        </div>
+
+        {/* Chart */}
         {data.length > 0 && (
-          <div className="mt-1 h-8 sm:h-10">
+          <div className="h-12 rounded-lg overflow-hidden mb-4 border" style={{
+            background: isDark ? "rgba(0,0,0,0.2)" : `${iconColors[variant] || "#2563eb"}08`,
+            borderColor: isDark ? "rgba(255,255,255,0.1)" : `${iconColors[variant] || "#2563eb"}20`,
+          }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0.18} />
-                    <stop offset="100%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0.03} />
+                    <stop offset="0%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="none"
+                  stroke={iconColors[variant] || "#2563eb"}
                   fill={`url(#${gradientId})`}
-                  strokeWidth={0}
-                  strokeOpacity={0}
+                  strokeWidth={2}
+                  strokeOpacity={1}
                   fillOpacity={1}
                   strokeLinejoin="round"
                   strokeLinecap="round"
@@ -182,48 +262,66 @@ export default function StatCard({
           </div>
         )}
 
-        {/* percent change badge */}
-        {data.length > 1 && (
-          <span
-            className="absolute top-2 right-2 rounded-lg px-2 py-0.5 text-xs font-semibold inline-flex items-center gap-1"
-            style={{
-              color: neutral,
-              background: isDark ? "#1e293b" : "#f1f5f9",
-              fontWeight: 600
-            }}
-          >
-            {pct >= 0 ? (
-              <ArrowTrendingUpIcon className="h-3 w-3" />
-            ) : (
-              <ArrowTrendingDownIcon className="h-3 w-3" />
-            )}
-            {Math.abs(pct).toFixed(1)}%
-          </span>
-        )}
-
-        {/* footer: timestamp + timeframe chips */}
-        <div className="mt-1 text-[10px] flex items-center justify-between" style={{ color: neutral }}>
-          <span
-            className="truncate"
-            style={{
-              color: "#fbbf24"
-              // Removed textShadow for glow
-            }}
-          >
-            {lastText ? `as of ${lastText}` : ''}
-          </span>
-          <div className="inline-flex items-center rounded-full bg-slate-100 p-0.5 shadow-inner dark:bg-slate-800/60">
-            {['W','M','Y'].map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className={`px-2 py-0.5 text-[10px] sm:text-xs rounded-full transition-colors ${range===r ? 'bg-white text-slate-900 shadow dark:bg-slate-700 dark:text-slate-100' : 'text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100'}`}
-                aria-label={`Show ${r==='W'?'7d':r==='M'?'30d':'365d'}`}
+        {/* Bottom: Percentage Badge and Timestamp */}
+        <div className="space-y-3 mt-auto">
+          <div className="flex items-center gap-3">
+            {data.length > 1 && (
+              <div
+                className="h-12 w-12 flex flex-col items-center justify-center rounded-full shadow-md border-2"
+                style={{
+                  background: pct >= 0
+                    ? (isDark ? "rgba(5, 150, 105, 0.25)" : "rgba(5, 150, 105, 0.1)")
+                    : (isDark ? "rgba(220, 38, 38, 0.25)" : "rgba(220, 38, 38, 0.1)"),
+                  color: pct >= 0 ? "#059669" : "#dc2626",
+                  borderColor: pct >= 0 ? (isDark ? "rgba(5, 150, 105, 0.4)" : "rgba(5, 150, 105, 0.3)") : (isDark ? "rgba(220, 38, 38, 0.4)" : "rgba(220, 38, 38, 0.3)"),
+                }}
               >
-                {r}
-              </button>
-            ))}
+                <div className="flex items-center gap-1">
+                  {pct >= 0 ? (
+                    <ArrowTrendingUpIcon className="h-4 w-4" />
+                  ) : (
+                    <ArrowTrendingDownIcon className="h-4 w-4" />
+                  )}
+                </div>
+                <div className="text-xs font-bold">
+                  {Math.abs(pct).toFixed(1)}%
+                </div>
+              </div>
+            )}
+            <div>
+              {data.length > 1 && (
+                <div className="text-xs font-semibold" style={{ color: pct >= 0 ? "#059669" : "#dc2626" }}>
+                  {pct >= 0 ? 'Increase' : 'Decrease'}
+                </div>
+              )}
+              {lastText && (
+                <div className="text-xs opacity-60" style={{ color: isDark ? "#cbd5e1" : "#64748b" }}>
+                  as of {lastText}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* AI Insight */}
+          {(insight || insightLoading) && (
+            <div
+              className="rounded-lg p-3 border text-xs leading-relaxed"
+              style={{
+                background: isDark ? "rgba(255,255,255,0.05)" : `${iconColors[variant] || "#2563eb"}08`,
+                borderColor: isDark ? "rgba(255,255,255,0.1)" : `${iconColors[variant] || "#2563eb"}20`,
+                color: isDark ? "#cbd5e1" : "#64748b",
+              }}
+            >
+              {insightLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-current animate-pulse"></div>
+                  <span className="opacity-70">Generating insight...</span>
+                </div>
+              ) : (
+                insight
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
