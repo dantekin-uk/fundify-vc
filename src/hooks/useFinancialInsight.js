@@ -1,14 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { generateInsight, getCachedInsight, setCachedInsight } from '../services/geminiInsights';
 
 export function useFinancialInsight(type, dataContext) {
   const [insight, setInsight] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchInsight = async () => {
-      const cacheKey = `${type}_${JSON.stringify(dataContext).slice(0, 10)}`;
+  // Stable cache key based on actual data values
+  const cacheKey = useMemo(() => {
+    if (!dataContext) return null;
+    try {
+      return `${type}_${JSON.stringify(dataContext)}`;
+    } catch {
+      return `${type}_${Date.now()}`;
+    }
+  }, [type, dataContext]);
 
+  useEffect(() => {
+    if (!cacheKey) return;
+
+    const fetchInsight = async () => {
       // Try to get cached insight first
       const cached = getCachedInsight(cacheKey);
       if (cached && typeof cached === 'string') {
@@ -42,7 +52,7 @@ export function useFinancialInsight(type, dataContext) {
     if (dataContext && (dataContext.amount !== undefined || dataContext.totalIncome !== undefined)) {
       fetchInsight();
     }
-  }, [type, dataContext]);
+  }, [cacheKey, dataContext]);
 
   return { insight, loading };
 }
