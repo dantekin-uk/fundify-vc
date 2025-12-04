@@ -18,7 +18,7 @@ export async function generateInsight(dataContext) {
     // Attempt to fetch AI insight from API
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch(API_PATH, {
         method: 'POST',
@@ -32,16 +32,28 @@ export async function generateInsight(dataContext) {
       if (res.ok) {
         const json = await res.json().catch(() => null);
         if (json && typeof json === 'object') {
-          const summary = json?.insight?.summary;
+          // Handle both direct summary and nested insight.summary
+          const summary = json?.insight?.summary || json?.summary;
           // Ensure we always return a string or null, never an object
           if (typeof summary === 'string' && summary.trim()) {
             return summary.trim();
           }
         }
+      } else {
+        const errorData = await res.text().catch(() => '');
+        console.debug(`AI insight API error (${res.status}):`, errorData);
       }
     } catch (fetchError) {
-      // API endpoint not available or timeout - silently continue without AI insight
-      console.debug('AI insight API unavailable:', fetchError?.message || fetchError);
+      // API endpoint not available, timeout, or server error - silently continue without AI insight
+      const isAbortError = fetchError?.name === 'AbortError';
+      const isNetworkError = fetchError?.message?.includes('Failed to fetch');
+      if (isAbortError) {
+        console.debug('AI insight request timed out');
+      } else if (isNetworkError) {
+        console.debug('AI insight API unreachable - ensure "npm run api:dev" is running');
+      } else {
+        console.debug('AI insight API unavailable:', fetchError?.message || fetchError);
+      }
     }
 
     // Return null if API fails - component will handle gracefully

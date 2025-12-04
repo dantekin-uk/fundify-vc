@@ -33,6 +33,29 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       open: false,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '/api'),
+          ws: true,
+          configure: (proxy, options) => {
+            proxy.on('error', (err, req, res) => {
+              console.error('[Proxy Error]', err.message);
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                success: false,
+                error: 'API server unavailable. Make sure "npm run api:dev" is running.',
+                details: err.message
+              }));
+            });
+
+            proxy.on('proxyReq', (proxyReq, req, res) => {
+              console.log(`[Proxy] ${req.method} ${req.url}`);
+            });
+          }
+        }
+      }
     },
     build: {
       outDir: 'dist',

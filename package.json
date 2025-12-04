@@ -32,6 +32,9 @@
   },
   "scripts": {
     "dev": "vite",
+    "api:dev": "node api-dev-server.js",
+    "dev:full": "node start-dev.js",
+    "dev:api-only": "concurrently \"npm run dev\" \"npm run api:dev\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -56,6 +59,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.22",
+    "concurrently": "^8.2.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "firebase-tools": "^14.17.0",
     "postcss": "^8.5.6",
     "supabase": "^2.58.5",

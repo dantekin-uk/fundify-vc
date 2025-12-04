@@ -18,3 +18,4 @@ yarn-error.log*
 
 # Vite build output
 dist
+build
