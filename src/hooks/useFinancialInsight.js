@@ -34,10 +34,10 @@ export function useFinancialInsight(type, dataContext) {
           ...dataContext,
         });
 
-        // Only set insight if it's a valid string
-        if (newInsight && typeof newInsight === 'string' && newInsight.trim()) {
-          setInsight(newInsight.trim());
-          setCachedInsight(cacheKey, newInsight.trim());
+        const asText = typeof newInsight === 'string' ? newInsight : (newInsight && typeof newInsight === 'object' ? String(newInsight.summary || '') : '');
+        if (asText && asText.trim()) {
+          setInsight(asText.trim());
+          setCachedInsight(cacheKey, asText.trim());
         } else {
           setInsight('');
         }
