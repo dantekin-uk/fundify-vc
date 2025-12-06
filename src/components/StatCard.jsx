@@ -327,8 +327,8 @@ export default function StatCard({
             ) : insight && typeof insight === 'string' ? (
               <div className="flex flex-col gap-2">
                 <p className="m-0">{insight}</p>
-                {insightSource?.source === 'openai' && (
-                  <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">✨ Powered by OpenAI</span>
+                {insightSource?.source && insightSource.source !== 'fallback' && (
+                  <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">✨ Powered by {insightSource.source === 'grok' ? 'Grok' : insightSource.source === 'openai' ? 'OpenAI' : 'AI'}</span>
                 )}
               </div>
             ) : (

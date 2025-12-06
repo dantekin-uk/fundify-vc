@@ -29,8 +29,8 @@ app.post('/api/ai/insight', async (req, res) => {
       return;
     }
 
-    const key = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const key = process.env.GROK_API_KEY;
+    const model = process.env.GROK_MODEL || 'grok-2-mini';
 
     const baseSummary = `${title}: ${Number(metrics?.amount || metrics?.value || 0).toLocaleString()} ${metrics?.currency || ''}`.trim();
     const change = Number(metrics?.periodChangePercent ?? metrics?.trend ?? 0);
@@ -58,7 +58,7 @@ app.post('/api/ai/insight', async (req, res) => {
     };
 
     if (!key) {
-      res.status(200).json({ success: true, insight: fallback() });
+      res.status(200).json({ success: true, insight: fallback(), error: 'missing_grok_key' });
       return;
     }
 
@@ -73,9 +73,9 @@ app.post('/api/ai/insight', async (req, res) => {
     ].join('\n');
 
     try {
-      console.log(`[OpenAI] Requesting insight for: ${title}, Model: ${model}`);
+      console.log(`[Grok] Requesting insight for: ${title}, Model: ${model}`);
 
-      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      const openaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -95,33 +95,33 @@ app.post('/api/ai/insight', async (req, res) => {
 
       if (!openaiResponse.ok) {
         const errorText = await openaiResponse.text();
-        console.error(`[OpenAI] API Error (${openaiResponse.status}):`, errorText);
-        res.status(200).json({ success: true, insight: fallback(), error: 'openai_error', details: errorText });
+        console.error(`[Grok] API Error (${openaiResponse.status}):`, errorText);
+        res.status(200).json({ success: true, insight: fallback(), error: 'grok_error', details: errorText });
         return;
       }
 
       const data = await openaiResponse.json();
       const content = data?.choices?.[0]?.message?.content || '';
-      console.log(`[OpenAI] Response received, content length: ${content.length}`);
+      console.log(`[Grok] Response received, content length: ${content.length}`);
 
       let parsed = null;
       try {
         parsed = JSON.parse(content);
       } catch (parseErr) {
-        console.error('[OpenAI] JSON Parse Error:', parseErr.message, 'Content:', content);
+        console.error('[Grok] JSON Parse Error:', parseErr.message, 'Content:', content);
         parsed = null;
       }
 
       if (!parsed || !parsed.summary || !parsed.recommendation || !parsed.urgency) {
-        console.warn('[OpenAI] Invalid response structure:', parsed);
+        console.warn('[Grok] Invalid response structure:', parsed);
         res.status(200).json({ success: true, insight: fallback(), error: 'bad_json' });
         return;
       }
 
-      console.log('[OpenAI] Successfully generated insight');
+      console.log('[Grok] Successfully generated insight');
       res.status(200).json({ success: true, insight: parsed });
     } catch (e) {
-      console.error('[OpenAI] Exception:', e.message);
+      console.error('[Grok] Exception:', e.message);
       res.status(200).json({ success: true, insight: fallback(), error: 'exception', details: e.message });
     }
   } catch (err) {
@@ -133,8 +133,8 @@ app.post('/api/ai/insight', async (req, res) => {
 const PORT = process.env.API_PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Development API server running on http://localhost:${PORT}`);
-  console.log(`OpenAI Key configured: ${process.env.OPENAI_API_KEY ? 'YES' : 'NO'}`);
-  console.log(`OpenAI Model: ${process.env.OPENAI_MODEL || 'gpt-4o-mini'}`);
+  console.log(`Grok Key configured: ${process.env.GROK_API_KEY ? 'YES' : 'NO'}`);
+  console.log(`Grok Model: ${process.env.GROK_MODEL || 'grok-2-mini'}`);
 });
 
 process.on('uncaughtException', (err) => {

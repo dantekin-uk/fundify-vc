@@ -58,11 +58,11 @@ export async function generateInsight(dataContext) {
         if (json && typeof json === 'object') {
           const summary = json?.insight?.summary || json?.summary;
           if (typeof summary === 'string' && summary.trim()) {
-            insightSource.source = 'openai';
+            insightSource.source = 'grok';
             insightSource.timestamp = Date.now();
             insightSource.title = title;
             insightSource.change = change;
-            console.log('✅ OpenAI Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
+            console.log('✅ Grok Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
             return summary.trim();
           }
         }

@@ -11,8 +11,8 @@ export default async function handler(req, res) {
     const metrics = body?.metrics && typeof body.metrics === 'object' ? body.metrics : null;
     if (!title || !metrics) { res.status(400).json({ error: 'Invalid body' }); return; }
 
-    const key = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const key = process.env.GROK_API_KEY;
+    const model = process.env.GROK_MODEL || 'grok-2-mini';
 
     const baseSummary = `${title}: ${Number(metrics?.amount || metrics?.value || 0).toLocaleString()} ${metrics?.currency || ''}`.trim();
     const change = Number(metrics?.periodChangePercent ?? metrics?.trend ?? 0);
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       return { summary, recommendation, urgency };
     };
 
-    if (!key) { res.status(200).json({ success: true, insight: fallback() }); return; }
+    if (!key) { res.status(200).json({ success: true, insight: fallback(), error: 'missing_grok_key' }); return; }
 
     const prompt = [
       `Title: ${title}`,
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     ].join('\n');
 
     try {
-      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      const r = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
           max_tokens: 160
         })
       });
-      if (!r.ok) { res.status(200).json({ success: true, insight: fallback(), error: 'openai_error' }); return; }
+      if (!r.ok) { res.status(200).json({ success: true, insight: fallback(), error: 'grok_error' }); return; }
       const data = await r.json();
       const content = data?.choices?.[0]?.message?.content || '';
       let parsed = null;
