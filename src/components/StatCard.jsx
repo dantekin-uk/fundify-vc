@@ -10,6 +10,7 @@ import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { useTheme } from '../context/ThemeContext';
 import { useFinancialInsight } from '../hooks/useFinancialInsight';
+import { insightSource } from '../services/geminiInsights';
 
 /* --------------------------------------------------------
    CONFIG
@@ -29,8 +30,8 @@ const ICONS = {
 --------------------------------------------------------- */
 
 export default function StatCard({
-  title,
-  value,
+  title = 'Untitled',
+  value = '0',
   series = [],
   variant = 'funds',
   className = '',
@@ -43,6 +44,13 @@ export default function StatCard({
   totalExpenses = 0,
 }) {
   const { isDark } = useTheme();
+
+  // Ensure values are strings/numbers, not objects
+  const safeTitle = typeof title === 'string' ? title : String(title || 'Untitled');
+  const safeValue = typeof value === 'string' || typeof value === 'number' ? String(value) : '0';
+  const safeTopExpenseCategories = Array.isArray(topExpenseCategories) ? topExpenseCategories : [];
+  const safeTopIncomeSource = typeof topIncomeSource === 'string' ? topIncomeSource : 'N/A';
+  const safeTopExpenseCategory = typeof topExpenseCategory === 'string' ? topExpenseCategory : 'N/A';
   const Icon = ICONS[variant] || CurrencyDollarIcon;
   const gradientId = useMemo(() => `stat-grad-${variant}-${String(title)}`.replace(/[^a-z0-9-_]/gi, '-'), [variant, title]);
 
@@ -90,15 +98,15 @@ export default function StatCard({
 
   // Prepare data context for AI insight
   const insightContext = useMemo(() => ({
-    amount: rawValue,
-    currency,
-    trend: pct,
-    topCategory: variant === 'expenses' ? topExpenseCategory : topIncomeSource,
+    amount: Number(rawValue) || 0,
+    currency: String(currency) || 'USD',
+    trend: Number(pct) || 0,
+    topCategory: variant === 'expenses' ? safeTopExpenseCategory : safeTopIncomeSource,
     periodChangePercent: Math.round(pct),
-    totalIncome,
-    totalExpenses,
-    topExpenseCategories,
-  }), [rawValue, currency, pct, variant, topExpenseCategory, topIncomeSource, totalIncome, totalExpenses, topExpenseCategories]);
+    totalIncome: Number(totalIncome) || 0,
+    totalExpenses: Number(totalExpenses) || 0,
+    topExpenseCategories: safeTopExpenseCategories,
+  }), [rawValue, currency, pct, variant, safeTopExpenseCategory, safeTopIncomeSource, totalIncome, totalExpenses, safeTopExpenseCategories]);
 
   // Get AI insight
   const { insight, loading: insightLoading } = useFinancialInsight(variant, insightContext);
@@ -165,7 +173,7 @@ export default function StatCard({
               <Icon className="h-5 w-5" style={{ color: iconColors[variant] || "#2563eb" }} />
             </div>
             <p className="text-xs uppercase tracking-widest font-semibold opacity-70 truncate" style={{ color: iconColors[variant] || "#2563eb" }}>
-              {title}
+              {safeTitle}
             </p>
           </div>
 
@@ -219,7 +227,7 @@ export default function StatCard({
         <div className="mb-4">
           <p
             className="font-bold overflow-hidden text-ellipsis text-2xl sm:text-3xl"
-            title={String(value)}
+            title={safeValue}
             style={{
               color: isDark ? "#fff" : "#1e293b",
               fontWeight: 800,
@@ -227,7 +235,7 @@ export default function StatCard({
               wordBreak: 'break-word'
             }}
           >
-            {value}
+            {safeValue}
           </p>
         </div>
 
@@ -303,25 +311,34 @@ export default function StatCard({
           </div>
 
           {/* AI Insight */}
-          {(insight || insightLoading) && (
-            <div
-              className="rounded-lg p-3 border text-xs leading-relaxed"
-              style={{
-                background: isDark ? "rgba(255,255,255,0.05)" : `${iconColors[variant] || "#2563eb"}08`,
-                borderColor: isDark ? "rgba(255,255,255,0.1)" : `${iconColors[variant] || "#2563eb"}20`,
-                color: isDark ? "#cbd5e1" : "#64748b",
-              }}
-            >
-              {insightLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-current animate-pulse"></div>
-                  <span className="opacity-70">Generating insight...</span>
-                </div>
-              ) : (
-                typeof insight === 'string' ? insight : null
-              )}
-            </div>
-          )}
+          <div
+            className="rounded-lg p-3 border text-xs leading-relaxed"
+            style={{
+              background: isDark ? "rgba(255,255,255,0.05)" : `${iconColors[variant] || "#2563eb"}08`,
+              borderColor: isDark ? "rgba(255,255,255,0.1)" : `${iconColors[variant] || "#2563eb"}20`,
+              color: isDark ? "#cbd5e1" : "#64748b",
+            }}
+          >
+            {insightLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-current animate-pulse"></div>
+                <span className="opacity-70">Generating insight...</span>
+              </div>
+            ) : insight && typeof insight === 'string' ? (
+              <div className="flex flex-col gap-2">
+                <p className="m-0">{insight}</p>
+                {insightSource?.source === 'openai' && (
+                  <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">✨ Powered by OpenAI</span>
+                )}
+              </div>
+            ) : (
+              <span className="opacity-50 italic">
+                {variant === 'income' && 'Monitor your income trends and donor patterns.'}
+                {variant === 'expenses' && 'Track your spending and optimize budget allocation.'}
+                {variant === 'balance' && 'Keep your balance healthy by balancing income and expenses.'}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

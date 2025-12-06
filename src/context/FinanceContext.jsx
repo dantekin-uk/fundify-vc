@@ -1065,6 +1065,9 @@ export function FinanceProvider({ children }) {
     const budgetSeries = days.map((d) => ({ date: d, value: sumAllocations }));
 
     return {
+      'Income': funds,
+      'Expenses': expensesSeries,
+      'Balance': balanceSeries,
       'Total Funds': funds,
       'Total Expenses': expensesSeries,
       'Net Available': balanceSeries,

@@ -32,7 +32,7 @@ const Dashboard = () => {
     seriesMap = {},
     expenses = [],
     incomes = [],
-  } = useFinance();
+  } = useFinance() || {};
 
   // Compute insight data
   const expenseMap = expenses
@@ -176,13 +176,13 @@ const Dashboard = () => {
               {/* Stats Card - Right Side (2 columns) */}
               <div className="lg:col-span-2 min-w-0">
                 <div className="grid grid-cols-2 gap-6">
-                  {stats.slice(0, 3).map((s) => (
+                  {Array.isArray(stats) && stats.slice(0, 3).map((s) => s && typeof s === 'object' ? (
                     <StatCard
-                      key={s.name}
-                      title={s.name}
-                      value={s.value}
-                      rawValue={s.raw}
-                      variant={s.variant}
+                      key={s.name || `stat-${Math.random()}`}
+                      title={s.name || 'Unknown'}
+                      value={s.value || '0'}
+                      rawValue={s.raw || 0}
+                      variant={s.variant || 'funds'}
                       series={seriesMap[s.name]}
                       currency={currency}
                       topExpenseCategories={topExpenseCategories}
@@ -191,7 +191,7 @@ const Dashboard = () => {
                       totalIncome={totalIncomeAmount}
                       totalExpenses={totalExpensesAmount}
                     />
-                  ))}
+                  ) : null)}
                 </div>
               </div>
             </div>
@@ -213,13 +213,13 @@ const Dashboard = () => {
               {/* Stats Grid - Full Width (3 columns) */}
               <div className="min-w-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {stats.slice(0, 3).map((s) => (
+                  {Array.isArray(stats) && stats.slice(0, 3).map((s) => s && typeof s === 'object' ? (
                     <StatCard
-                      key={s.name}
-                      title={s.name}
-                      value={s.value}
-                      rawValue={s.raw}
-                      variant={s.variant}
+                      key={s.name || `stat-${Math.random()}`}
+                      title={s.name || 'Unknown'}
+                      value={s.value || '0'}
+                      rawValue={s.raw || 0}
+                      variant={s.variant || 'funds'}
                       series={seriesMap[s.name]}
                       currency={currency}
                       topExpenseCategories={topExpenseCategories}
@@ -228,7 +228,7 @@ const Dashboard = () => {
                       totalIncome={totalIncomeAmount}
                       totalExpenses={totalExpensesAmount}
                     />
-                  ))}
+                  ) : null)}
                 </div>
               </div>
             </div>
