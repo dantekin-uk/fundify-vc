@@ -29,7 +29,7 @@ app.post('/api/ai/insight', async (req, res) => {
       return;
     }
 
-    const key = process.env.GROK_API_KEY;
+    const key = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     const model = process.env.GROK_MODEL || 'grok-2-mini';
 
     const baseSummary = `${title}: ${Number(metrics?.amount || metrics?.value || 0).toLocaleString()} ${metrics?.currency || ''}`.trim();
@@ -58,7 +58,7 @@ app.post('/api/ai/insight', async (req, res) => {
     };
 
     if (!key) {
-      res.status(200).json({ success: true, insight: fallback(), error: 'missing_grok_key' });
+      res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'missing_grok_key' });
       return;
     }
 
@@ -96,7 +96,7 @@ app.post('/api/ai/insight', async (req, res) => {
       if (!openaiResponse.ok) {
         const errorText = await openaiResponse.text();
         console.error(`[Grok] API Error (${openaiResponse.status}):`, errorText);
-        res.status(200).json({ success: true, insight: fallback(), error: 'grok_error', details: errorText });
+        res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'grok_error', details: errorText });
         return;
       }
 
@@ -114,15 +114,15 @@ app.post('/api/ai/insight', async (req, res) => {
 
       if (!parsed || !parsed.summary || !parsed.recommendation || !parsed.urgency) {
         console.warn('[Grok] Invalid response structure:', parsed);
-        res.status(200).json({ success: true, insight: fallback(), error: 'bad_json' });
+        res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'bad_json' });
         return;
       }
 
       console.log('[Grok] Successfully generated insight');
-      res.status(200).json({ success: true, insight: parsed });
+      res.status(200).json({ success: true, provider: 'grok', insight: parsed });
     } catch (e) {
       console.error('[Grok] Exception:', e.message);
-      res.status(200).json({ success: true, insight: fallback(), error: 'exception', details: e.message });
+      res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'exception', details: e.message });
     }
   } catch (err) {
     console.error('[API] Unhandled error:', err.message);

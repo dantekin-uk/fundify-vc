@@ -55,8 +55,46 @@ const AdminDashboard = () => {
     fundingRows = { rows: [] },
     byFunder = [],
     byProject = [],
-    seriesMap = {}
-  } = useFinance();
+    seriesMap = {},
+    expenses = [],
+    incomes = [],
+  } = useFinance() || {};
+
+  // Compute insight context metrics
+  const expenseMap = expenses
+    .filter(e => e.status === 'posted')
+    .reduce((acc, e) => {
+      const existing = acc.get(e.category) || 0;
+      acc.set(e.category, existing + e.amount);
+      return acc;
+    }, new Map());
+
+  const topExpenseCategories = Array.from(expenseMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([cat]) => cat);
+
+  const topExpenseCategory = topExpenseCategories[0] || 'N/A';
+
+  const incomeBySource = incomes
+    .filter(i => i.status === 'posted')
+    .reduce((acc, i) => {
+      const source = i.projectId ? 'Project' : 'Donor';
+      acc[source] = (acc[source] || 0) + i.amount;
+      return acc;
+    }, {});
+
+  const topIncomeSource = Object.keys(incomeBySource).length > 0
+    ? Object.entries(incomeBySource).sort((a, b) => b[1] - a[1])[0][0]
+    : 'N/A';
+
+  const totalIncomeAmount = incomes
+    .filter(i => i.status === 'posted')
+    .reduce((sum, i) => sum + i.amount, 0);
+
+  const totalExpensesAmount = expenses
+    .filter(e => e.status === 'posted')
+    .reduce((sum, e) => sum + e.amount, 0);
 
   const defaultPayment = paymentMethods.find(m => m.isDefault) || paymentMethods[0] || null;
 
@@ -211,6 +249,12 @@ const AdminDashboard = () => {
                   rawValue={s.raw}
                   variant={s.variant}
                   series={seriesMap[s.name]}
+                  currency={currency}
+                  topExpenseCategories={topExpenseCategories}
+                  topIncomeSource={topIncomeSource}
+                  topExpenseCategory={topExpenseCategory}
+                  totalIncome={totalIncomeAmount}
+                  totalExpenses={totalExpensesAmount}
                 />
               ))}
             </div>
@@ -259,6 +303,12 @@ const AdminDashboard = () => {
                   rawValue={s.raw}
                   variant={s.variant}
                   series={seriesMap[s.name]}
+                  currency={currency}
+                  topExpenseCategories={topExpenseCategories}
+                  topIncomeSource={topIncomeSource}
+                  topExpenseCategory={topExpenseCategory}
+                  totalIncome={totalIncomeAmount}
+                  totalExpenses={totalExpensesAmount}
                 />
               ))}
             </div>

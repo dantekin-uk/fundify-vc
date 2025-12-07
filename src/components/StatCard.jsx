@@ -241,7 +241,7 @@ export default function StatCard({
 
         {/* Chart */}
         {data.length > 0 && (
-          <div className="h-12 rounded-lg overflow-hidden mb-4 border" style={{
+          <div className="h-20 rounded-lg overflow-hidden mb-4 border" style={{
             background: isDark ? "rgba(0,0,0,0.2)" : `${iconColors[variant] || "#2563eb"}08`,
             borderColor: isDark ? "rgba(255,255,255,0.1)" : `${iconColors[variant] || "#2563eb"}20`,
           }}>

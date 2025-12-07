@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     const metrics = body?.metrics && typeof body.metrics === 'object' ? body.metrics : null;
     if (!title || !metrics) { res.status(400).json({ error: 'Invalid body' }); return; }
 
-    const key = process.env.GROK_API_KEY;
+    const key = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     const model = process.env.GROK_MODEL || 'grok-2-mini';
 
     const baseSummary = `${title}: ${Number(metrics?.amount || metrics?.value || 0).toLocaleString()} ${metrics?.currency || ''}`.trim();
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       return { summary, recommendation, urgency };
     };
 
-    if (!key) { res.status(200).json({ success: true, insight: fallback(), error: 'missing_grok_key' }); return; }
+    if (!key) { res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'missing_grok_key' }); return; }
 
     const prompt = [
       `Title: ${title}`,
@@ -63,17 +63,17 @@ export default async function handler(req, res) {
           max_tokens: 160
         })
       });
-      if (!r.ok) { res.status(200).json({ success: true, insight: fallback(), error: 'grok_error' }); return; }
+      if (!r.ok) { res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'grok_error' }); return; }
       const data = await r.json();
       const content = data?.choices?.[0]?.message?.content || '';
       let parsed = null;
       try { parsed = JSON.parse(content); } catch { parsed = null; }
       if (!parsed || !parsed.summary || !parsed.recommendation || !parsed.urgency) {
-        res.status(200).json({ success: true, insight: fallback(), error: 'bad_json' }); return;
+        res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'bad_json' }); return;
       }
-      res.status(200).json({ success: true, insight: parsed });
+      res.status(200).json({ success: true, provider: 'grok', insight: parsed });
     } catch (e) {
-      res.status(200).json({ success: true, insight: fallback(), error: 'exception' });
+      res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'exception' });
     }
   } catch (err) {
     res.status(400).json({ error: 'Bad Request' });

@@ -57,12 +57,17 @@ export async function generateInsight(dataContext) {
         const json = await res.json().catch(() => null);
         if (json && typeof json === 'object') {
           const summary = json?.insight?.summary || json?.summary;
+          const provider = json?.provider || (json?.error ? 'fallback' : null);
           if (typeof summary === 'string' && summary.trim()) {
-            insightSource.source = 'grok';
+            insightSource.source = provider || 'grok';
             insightSource.timestamp = Date.now();
             insightSource.title = title;
             insightSource.change = change;
-            console.log('✅ Grok Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
+            if (insightSource.source === 'grok') {
+              console.log('✅ Grok Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
+            } else {
+              console.log('📊 Fallback Insight Used:', { title, change, insight: summary.substring(0, 60) + '...' });
+            }
             return summary.trim();
           }
         }
