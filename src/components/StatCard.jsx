@@ -93,7 +93,8 @@ export default function StatCard({
     if (!data || data.length < 2) return 0;
     const a = Number(data[0]?.value ?? 0);
     const b = Number(data[data.length - 1]?.value ?? 0);
-    return a ? ((b - a) / Math.abs(a)) * 100 : 0;
+    const raw = a ? ((b - a) / Math.abs(a)) * 100 : 0;
+    return Math.max(-100, Math.min(100, raw));
   }, [data]);
 
   // Prepare data context for AI insight
@@ -102,7 +103,7 @@ export default function StatCard({
     currency: String(currency) || 'USD',
     trend: Number(pct) || 0,
     topCategory: variant === 'expenses' ? safeTopExpenseCategory : safeTopIncomeSource,
-    periodChangePercent: Math.round(pct),
+    periodChangePercent: Math.round(Math.max(-100, Math.min(100, Number(pct) || 0))),
     totalIncome: Number(totalIncome) || 0,
     totalExpenses: Number(totalExpenses) || 0,
     topExpenseCategories: safeTopExpenseCategories,

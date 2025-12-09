@@ -11,12 +11,13 @@ export default async function handler(req, res) {
     const metrics = body?.metrics && typeof body.metrics === 'object' ? body.metrics : null;
     if (!title || !metrics) { res.status(400).json({ error: 'Invalid body' }); return; }
 
-    const key = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-    const model = process.env.GROK_MODEL || 'grok-2-mini';
+    const key = process.env.HF_API_KEY;
+    const model = process.env.HF_MODEL || 'microsoft/Phi-3.5-mini-instruct';
 
     const baseSummary = `${title}: ${Number(metrics?.amount || metrics?.value || 0).toLocaleString()} ${metrics?.currency || ''}`.trim();
     const change = Number(metrics?.periodChangePercent ?? metrics?.trend ?? 0);
-    const urgency = Math.abs(change) >= 15 ? 'high' : Math.abs(change) >= 7 ? 'medium' : 'low';
+    const clamped = Math.max(-100, Math.min(100, change));
+    const urgency = Math.abs(clamped) >= 15 ? 'high' : Math.abs(clamped) >= 7 ? 'medium' : 'low';
     const fallback = () => {
       const isIncome = /income/i.test(title);
       const isExpenses = /expense/i.test(title);
@@ -24,24 +25,24 @@ export default async function handler(req, res) {
       let summary = baseSummary;
       let recommendation = 'Monitor trends and adjust plan.';
       if (isIncome) {
-        summary = change >= 0 ? `Income up ${Math.round(change)}%` : `Income down ${Math.abs(Math.round(change))}%`;
-        recommendation = change >= 0 ? 'Engage donors and maintain momentum.' : 'Strengthen outreach to improve inflows.';
+        summary = clamped >= 0 ? `Income up ${Math.round(Math.abs(clamped))}%` : `Income down ${Math.round(Math.abs(clamped))}%`;
+        recommendation = clamped >= 0 ? 'Engage donors and maintain momentum.' : 'Strengthen outreach to improve inflows.';
       } else if (isExpenses) {
-        summary = change >= 0 ? `Expenses up ${Math.round(change)}%` : `Expenses down ${Math.abs(Math.round(change))}%`;
-        recommendation = change >= 0 ? 'Prioritize cost control on top categories.' : 'Maintain current spending discipline.';
+        summary = clamped >= 0 ? `Expenses up ${Math.round(Math.abs(clamped))}%` : `Expenses down ${Math.round(Math.abs(clamped))}%`;
+        recommendation = clamped >= 0 ? 'Prioritize cost control on top categories.' : 'Maintain current spending discipline.';
       } else if (isBalance) {
-        summary = change >= 0 ? `Balance improving ${Math.round(change)}%` : `Balance declining ${Math.abs(Math.round(change))}%`;
-        recommendation = change >= 0 ? 'Allocate surplus to key projects.' : 'Reduce expenses to stabilize balance.';
+        summary = clamped >= 0 ? `Balance improving ${Math.round(Math.abs(clamped))}%` : `Balance declining ${Math.round(Math.abs(clamped))}%`;
+        recommendation = clamped >= 0 ? 'Allocate surplus to key projects.' : 'Reduce expenses to stabilize balance.';
       }
       return { summary, recommendation, urgency };
     };
 
-    if (!key) { res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'missing_grok_key' }); return; }
+    if (!key) { res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'missing_hf_key' }); return; }
 
     const prompt = [
       `Title: ${title}`,
       `Amount: ${metrics?.amount ?? metrics?.value ?? 0} ${metrics?.currency || ''}`,
-      `ChangePercent: ${change}`,
+      `ChangePercent: ${clamped}`,
       `TopCategory: ${metrics?.topCategory || metrics?.topExpenseCategory || metrics?.topIncomeSource || 'N/A'}`,
       `TotalIncome: ${metrics?.totalIncome ?? 'N/A'}`,
       `TotalExpenses: ${metrics?.totalExpenses ?? 'N/A'}`,
@@ -49,29 +50,26 @@ export default async function handler(req, res) {
     ].join('\n');
 
     try {
-      const r = await fetch('https://api.x.ai/v1/chat/completions', {
+      const r = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({
-          model,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: 'Generate concise financial insights as JSON only.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 160
+          inputs: [
+            'Generate concise financial insights as JSON only. Keys: summary, recommendation, urgency (low|medium|high). No prose.',
+            prompt
+          ].join('\n'),
+          parameters: { temperature: 0.3, max_new_tokens: 160, top_p: 0.9, return_full_text: false }
         })
       });
-      if (!r.ok) { res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'grok_error' }); return; }
+      if (!r.ok) { res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'hf_error' }); return; }
       const data = await r.json();
-      const content = data?.choices?.[0]?.message?.content || '';
+      const content = (Array.isArray(data) ? (data[0]?.generated_text || '') : (data?.generated_text || (typeof data === 'string' ? data : '')));
       let parsed = null;
       try { parsed = JSON.parse(content); } catch { parsed = null; }
       if (!parsed || !parsed.summary || !parsed.recommendation || !parsed.urgency) {
         res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'bad_json' }); return;
       }
-      res.status(200).json({ success: true, provider: 'grok', insight: parsed });
+      res.status(200).json({ success: true, provider: 'huggingface', insight: parsed });
     } catch (e) {
       res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'exception' });
     }

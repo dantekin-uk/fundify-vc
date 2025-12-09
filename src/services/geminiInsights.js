@@ -7,17 +7,18 @@ function generateFallbackInsight(type, change) {
   const isIncome = /income/i.test(type);
   const isExpenses = /expense/i.test(type);
   const isBalance = /balance/i.test(type);
-  const changeAbs = Math.abs(Math.round(change));
+  const clamped = Math.max(-100, Math.min(100, Number(change) || 0));
+  const changeAbs = Math.abs(Math.round(clamped));
 
   if (isIncome) {
     if (changeAbs < 1) return 'Income steady. Monitor for opportunities to increase.';
-    return change >= 0 ? `Income up ${changeAbs}%. Good momentum!` : `Income down ${changeAbs}%. Consider fundraising strategies.`;
+    return clamped >= 0 ? `Income up ${changeAbs}%. Good momentum!` : `Income down ${changeAbs}%. Consider fundraising strategies.`;
   } else if (isExpenses) {
     if (changeAbs < 1) return 'Expenses stable. Maintain current controls.';
-    return change >= 0 ? `Expenses up ${changeAbs}%. Review major categories.` : `Expenses down ${changeAbs}%. Great cost control!`;
+    return clamped >= 0 ? `Expenses up ${changeAbs}%. Review major categories.` : `Expenses down ${changeAbs}%. Great cost control!`;
   } else if (isBalance) {
     if (changeAbs < 1) return 'Balance unchanged. Keep monitoring closely.';
-    return change >= 0 ? `Balance improving ${changeAbs}%. Surplus growing!` : `Balance declining ${changeAbs}%. Increase income or reduce expenses.`;
+    return clamped >= 0 ? `Balance improving ${changeAbs}%. Surplus growing!` : `Balance declining ${changeAbs}%. Increase income or reduce expenses.`;
   }
   return 'Monitor trends and adjust your plans accordingly.';
 }
@@ -59,11 +60,13 @@ export async function generateInsight(dataContext) {
           const summary = json?.insight?.summary || json?.summary;
           const provider = json?.provider || (json?.error ? 'fallback' : null);
           if (typeof summary === 'string' && summary.trim()) {
-            insightSource.source = provider || 'grok';
+            insightSource.source = provider || 'huggingface';
             insightSource.timestamp = Date.now();
             insightSource.title = title;
             insightSource.change = change;
-            if (insightSource.source === 'grok') {
+            if (insightSource.source === 'huggingface') {
+              console.log('🤗 Hugging Face Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
+            } else if (insightSource.source === 'grok') {
               console.log('✅ Grok Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
             } else {
               console.log('📊 Fallback Insight Used:', { title, change, insight: summary.substring(0, 60) + '...' });
