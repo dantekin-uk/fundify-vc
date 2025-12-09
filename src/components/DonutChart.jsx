@@ -19,7 +19,7 @@ export default function DonutChart({ className = '' }) {
         <div className="flex-1 h-56">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={expenseData} dataKey="value" nameKey="name" innerRadius={54} outerRadius={82} paddingAngle={2} cornerRadius={8}>
+              <Pie data={expenseData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={80} paddingAngle={2} cornerRadius={8}>
                 {expenseData.map((entry, i) => (
                   <Cell key={entry.name} fill={colors[i % colors.length]} />
                 ))}
