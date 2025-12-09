@@ -87,7 +87,7 @@ app.post('/api/ai/insight', async (req, res) => {
             'Generate concise financial insights as JSON only. Keys: summary, recommendation, urgency (low|medium|high). No prose.',
             prompt
           ].join('\n'),
-          parameters: { temperature: 0.3, max_new_tokens: 160, top_p: 0.9, return_full_text: false }
+          parameters: { temperature: 0.3, max_new_tokens: 160, top_p: 0.9, return_full_text: false, wait_for_model: true }
         })
       });
 
@@ -104,7 +104,10 @@ app.post('/api/ai/insight', async (req, res) => {
 
       let parsed = null;
       try {
-        parsed = JSON.parse(content);
+        const start = content.indexOf('{');
+        const end = content.lastIndexOf('}');
+        const jsonText = start >= 0 && end >= start ? content.slice(start, end + 1) : content;
+        parsed = JSON.parse(jsonText);
       } catch (parseErr) {
         console.error('[HF] JSON Parse Error:', parseErr.message, 'Content:', content);
         parsed = null;

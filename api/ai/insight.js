@@ -58,14 +58,21 @@ export default async function handler(req, res) {
             'Generate concise financial insights as JSON only. Keys: summary, recommendation, urgency (low|medium|high). No prose.',
             prompt
           ].join('\n'),
-          parameters: { temperature: 0.3, max_new_tokens: 160, top_p: 0.9, return_full_text: false }
+          parameters: { temperature: 0.3, max_new_tokens: 160, top_p: 0.9, return_full_text: false, wait_for_model: true }
         })
       });
       if (!r.ok) { res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'hf_error' }); return; }
       const data = await r.json();
       const content = (Array.isArray(data) ? (data[0]?.generated_text || '') : (data?.generated_text || (typeof data === 'string' ? data : '')));
       let parsed = null;
-      try { parsed = JSON.parse(content); } catch { parsed = null; }
+      try {
+        const start = content.indexOf('{');
+        const end = content.lastIndexOf('}');
+        const jsonText = start >= 0 && end >= start ? content.slice(start, end + 1) : content;
+        parsed = JSON.parse(jsonText);
+      } catch {
+        parsed = null;
+      }
       if (!parsed || !parsed.summary || !parsed.recommendation || !parsed.urgency) {
         res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'bad_json' }); return;
       }
