@@ -3,17 +3,19 @@ import FormInput from '../components/FormInput';
 import { useFinance } from '../context/FinanceContext';
 import { uploadFiles } from '../services/cloudinary';
 import { useOrg } from '../context/OrgContext';
+import { useAuth } from '../context/AuthContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import SuccessAnimation from '../components/ui/SuccessAnimation';
 import { useNavigate } from 'react-router-dom';
-import { markAsRealData } from '../utils/demoDataHelper';
+import { markAsRealData, shouldShowSuccessAnimations } from '../utils/demoDataHelper';
 
 const CATEGORIES = ['Salaries','Operations','Transport','Utilities','Training','Supplies','Other'];
 
 export default function Expenses() {
   const { projects, addExpense, expenses, approveExpense, rejectExpense, wallets, removeItem } = useFinance();
-  const { currency, role, activeOrgId } = useOrg();
+  const { currency, role, activeOrgId, orgs } = useOrg();
+  const { user } = useAuth();
   const navigate = useNavigate();
   // ensure lists are defined to avoid runtime errors when not yet loaded
   const safeProjects = projects || [];
@@ -27,6 +29,10 @@ export default function Expenses() {
   const [saving3, setSaving3] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Check if user should see success animations (only for new users)
+  const currentOrg = orgs?.find(o => o.id === activeOrgId);
+  const shouldShowAnimations = shouldShowSuccessAnimations(currentOrg, user);
 
   const handleSuccessAnimationComplete = () => {
     // Navigate to dashboard after animation completes
@@ -50,10 +56,15 @@ export default function Expenses() {
         // Mark organization as having real data (this disables demo mode)
         await markAsRealData(activeOrgId);
         
-        // Get project name for success message
-        const projectName = safeProjects.find(p => p.id === projForm.projectId)?.name || 'Project';
-        setSuccessMessage(`Expense of ${formatAmount(Number(projForm.amount || 0), currency)} added to ${projectName}!`);
-        setShowSuccessAnimation(true);
+        // Show success animation and navigate (only for new users)
+        if (shouldShowAnimations) {
+          const projectName = safeProjects.find(p => p.id === projForm.projectId)?.name || 'Project';
+          setSuccessMessage(`Expense of ${formatAmount(Number(projForm.amount || 0), currency)} added to ${projectName}!`);
+          setShowSuccessAnimation(true);
+        } else {
+          // For existing users, just navigate directly without animation
+          navigate('/app/dashboard');
+        }
         
         setProjForm({ projectId: '', category: 'Operations', amount: '', date: '', description: '' });
         setProjFiles([]);
@@ -92,10 +103,15 @@ export default function Expenses() {
         // Mark organization as having real data (this disables demo mode)
         await markAsRealData(activeOrgId);
         
-        // Get wallet name for success message
-        const walletName = walletForm.walletId === 'ORG' ? 'Organization' : (safeWallets.find(w => w.id === walletForm.walletId)?.name || 'Wallet');
-        setSuccessMessage(`Expense of ${formatAmount(Number(walletForm.amount || 0), currency)} added to ${walletName}!`);
-        setShowSuccessAnimation(true);
+        // Show success animation and navigate (only for new users)
+        if (shouldShowAnimations) {
+          const walletName = walletForm.walletId === 'ORG' ? 'Organization' : (safeWallets.find(w => w.id === walletForm.walletId)?.name || 'Wallet');
+          setSuccessMessage(`Expense of ${formatAmount(Number(walletForm.amount || 0), currency)} added to ${walletName}!`);
+          setShowSuccessAnimation(true);
+        } else {
+          // For existing users, just navigate directly without animation
+          navigate('/app/dashboard');
+        }
         
         setWalletForm({ walletId: 'ORG', category: 'Operations', amount: '', date: '', description: '' });
         setWalletFiles([]);

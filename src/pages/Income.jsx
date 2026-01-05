@@ -3,15 +3,17 @@ import FormInput from '../components/FormInput';
 import { useFinance } from '../context/FinanceContext';
 import { uploadFiles } from '../services/cloudinary';
 import { useOrg } from '../context/OrgContext';
+import { useAuth } from '../context/AuthContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import SuccessAnimation from '../components/ui/SuccessAnimation';
 import { useNavigate } from 'react-router-dom';
-import { markAsRealData } from '../utils/demoDataHelper';
+import { markAsRealData, shouldShowSuccessAnimations } from '../utils/demoDataHelper';
 
 export default function Income() {
   const { projects = [], addIncome, incomes = [], wallets = [], removeItem } = useFinance();
-  const { currency, role, activeOrgId } = useOrg();
+  const { currency, role, activeOrgId, orgs } = useOrg();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [projForm, setProjForm] = useState({ projectId: '', amount: '', date: '', description: '' });
   const [orgForm, setOrgForm] = useState({ walletId: 'ORG', amount: '', date: '', description: '' });
@@ -21,6 +23,10 @@ export default function Income() {
   const [saving2, setSaving2] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Check if user should see success animations (only for new users)
+  const currentOrg = orgs?.find(o => o.id === activeOrgId);
+  const shouldShowAnimations = shouldShowSuccessAnimations(currentOrg, user);
 
   const canAdd = role === 'admin' || role === 'financial_officer';
 
@@ -46,10 +52,15 @@ export default function Income() {
         // Mark organization as having real data (this disables demo mode)
         await markAsRealData(activeOrgId);
         
-        // Get project name for success message
-        const projectName = projects.find(p => p.id === projForm.projectId)?.name || 'Project';
-        setSuccessMessage(`Income of ${formatAmount(Number(projForm.amount), currency)} added to ${projectName}!`);
-        setShowSuccessAnimation(true);
+        // Show success animation and navigate (only for new users)
+        if (shouldShowAnimations) {
+          const projectName = projects.find(p => p.id === projForm.projectId)?.name || 'Project';
+          setSuccessMessage(`Income of ${formatAmount(Number(projForm.amount), currency)} added to ${projectName}!`);
+          setShowSuccessAnimation(true);
+        } else {
+          // For existing users, just navigate directly without animation
+          navigate('/app/dashboard');
+        }
         
         setProjForm({ projectId: '', amount: '', date: '', description: '' });
         setProjFiles([]);
@@ -79,10 +90,15 @@ export default function Income() {
         // Mark organization as having real data (this disables demo mode)
         await markAsRealData(activeOrgId);
         
-        // Get wallet name for success message
-        const walletName = orgForm.walletId === 'ORG' ? 'Organization' : (wallets.find(w => w.id === orgForm.walletId)?.name || 'Wallet');
-        setSuccessMessage(`Income of ${formatAmount(Number(orgForm.amount), currency)} added to ${walletName}!`);
-        setShowSuccessAnimation(true);
+        // Show success animation and navigate (only for new users)
+        if (shouldShowAnimations) {
+          const walletName = orgForm.walletId === 'ORG' ? 'Organization' : (wallets.find(w => w.id === orgForm.walletId)?.name || 'Wallet');
+          setSuccessMessage(`Income of ${formatAmount(Number(orgForm.amount), currency)} added to ${walletName}!`);
+          setShowSuccessAnimation(true);
+        } else {
+          // For existing users, just navigate directly without animation
+          navigate('/app/dashboard');
+        }
         
         setOrgForm({ walletId: 'ORG', amount: '', date: '', description: '' });
         setOrgFiles([]);

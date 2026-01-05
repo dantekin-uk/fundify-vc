@@ -2,22 +2,26 @@ import { useMemo, useState } from 'react';
 import FormInput from '../components/FormInput';
 import { useFinance } from '../context/FinanceContext';
 import { useOrg } from '../context/OrgContext';
+import { useAuth } from '../context/AuthContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import SuccessAnimation from '../components/ui/SuccessAnimation';
 import { useNavigate } from 'react-router-dom';
-import { markAsRealData } from '../utils/demoDataHelper';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { markAsRealData, shouldShowSuccessAnimations } from '../utils/demoDataHelper';
 
 export default function Projects() {
   const { funders, addProject, byProject, removeItem } = useFinance();
-  const { role, currency, activeOrgId } = useOrg();
+  const { role, currency, activeOrgId, orgs } = useOrg();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', type: 'igp', funderId: '', allocation: '', startDate: '', endDate: '', notes: '' });
   const [saving, setSaving] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Check if user should see success animations (only for new users)
+  const currentOrg = orgs?.find(o => o.id === activeOrgId);
+  const shouldShowAnimations = shouldShowSuccessAnimations(currentOrg, user);
 
   const handleSuccessAnimationComplete = () => {
     // Navigate to dashboard overview after animation completes
@@ -35,10 +39,15 @@ export default function Projects() {
       // Mark organization as having real data (this disables demo mode)
       await markAsRealData(activeOrgId);
       
-      // Show success animation
-      const allocationText = form.allocation ? ` with budget ${formatAmount(Number(form.allocation || 0), currency)}` : '';
-      setSuccessMessage(`Project "${form.name}" created successfully${allocationText}!`);
-      setShowSuccessAnimation(true);
+      // Show success animation and navigate (only for new users)
+      if (shouldShowAnimations) {
+        const allocationText = form.allocation ? ` with budget ${formatAmount(Number(form.allocation || 0), currency)}` : '';
+        setSuccessMessage(`Project "${form.name}" created successfully${allocationText}!`);
+        setShowSuccessAnimation(true);
+      } else {
+        // For existing users, just navigate directly without animation
+        navigate('/app/dashboard');
+      }
       
       setForm({ name: '', type: 'igp', funderId: '', allocation: '', startDate: '', endDate: '', notes: '' });
     } catch (err) {

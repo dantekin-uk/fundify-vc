@@ -31,7 +31,19 @@ export const shouldShowDemoBanner = (org, user) => {
   const isTrulyNewOrg = !org.demoInitializedAt && !org.hasRealData;
   const hasDemoMode = org.isDemoMode === true;
   
-  // Show demo banner if this is a truly new organization that just got demo data
-  // OR if the user hasn't completed setup yet
-  return hasDemoMode && (isTrulyNewOrg || !user?.hasCompletedSetup);
+  // Show demo banner ONLY for truly new users who just created account
+  // Don't show for existing users who are logging in
+  return hasDemoMode && isTrulyNewOrg && user?.hasCompletedSetup === false;
+};
+
+/**
+ * Checks if user should see success animations
+ * Returns false for existing users, true only for new users during onboarding
+ */
+export const shouldShowSuccessAnimations = (org, user) => {
+  if (!org || !user) return false;
+  
+  // Only show animations for truly new users who haven't completed setup
+  const isTrulyNewUser = !org.demoInitializedAt && !org.hasRealData && user?.hasCompletedSetup === false;
+  return isTrulyNewUser;
 };

@@ -8,14 +8,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import SendInvitation from '../components/SendInvitation';
 import SuccessAnimation from '../components/ui/SuccessAnimation';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { markAsRealData } from '../utils/demoDataHelper';
+import { markAsRealData, shouldShowSuccessAnimations } from '../utils/demoDataHelper';
 import './AddFunder.css';
 
 export default function AddFunder() {
   const { addFunder, byFunder } = useFinance();
-  const { activeOrgId } = useOrg();
+  const { activeOrgId, orgs } = useOrg();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', contact: '', notes: '' });
   const [saving, setSaving] = useState(false);
@@ -23,6 +22,10 @@ export default function AddFunder() {
   const [newFunderId, setNewFunderId] = useState(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  
+  // Check if user should see success animations (only for new users)
+  const currentOrg = orgs?.find(o => o.id === activeOrgId);
+  const shouldShowAnimations = shouldShowSuccessAnimations(currentOrg, user);
   
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -36,8 +39,13 @@ export default function AddFunder() {
       // Mark organization as having real data (this disables demo mode)
       await markAsRealData(activeOrgId);
       
-      // Show success animation and then navigate to dashboard
-      setShowSuccessAnimation(true);
+      // Show success animation and navigate to dashboard (only for new users)
+      if (shouldShowAnimations) {
+        setShowSuccessAnimation(true);
+      } else {
+        // For existing users, just navigate directly without animation
+        navigate('/app/dashboard');
+      }
       
       // Reset the form
       setForm({ name: '', contact: '', notes: '' });
