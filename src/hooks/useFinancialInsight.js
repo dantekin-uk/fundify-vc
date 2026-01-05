@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { generateInsight } from '../services/geminiInsights';
+import { useState, useEffect, useMemo } from 'react';
+import { generateInsight, getCachedInsight, setCachedInsight } from '../services/geminiInsights';
 
 export function useFinancialInsight(type, dataContext) {
   const [insight, setInsight] = useState('');
@@ -19,7 +19,14 @@ export function useFinancialInsight(type, dataContext) {
     if (!cacheKey) return;
 
     const fetchInsight = async () => {
-      // Always generate fresh insight for real-time behavior
+      // Try to get cached insight first
+      const cached = getCachedInsight(cacheKey);
+      if (cached && typeof cached === 'string') {
+        setInsight(cached);
+        return;
+      }
+
+      // Generate new insight
       setLoading(true);
       try {
         const newInsight = await generateInsight({
@@ -27,9 +34,10 @@ export function useFinancialInsight(type, dataContext) {
           ...dataContext,
         });
 
-        const asText = typeof newInsight === 'string' ? newInsight : (newInsight && typeof newInsight === 'object' ? String(newInsight.summary || '') : '');
-        if (asText && asText.trim()) {
-          setInsight(asText.trim());
+        // Only set insight if it's a valid string
+        if (newInsight && typeof newInsight === 'string' && newInsight.trim()) {
+          setInsight(newInsight.trim());
+          setCachedInsight(cacheKey, newInsight.trim());
         } else {
           setInsight('');
         }
@@ -40,14 +48,10 @@ export function useFinancialInsight(type, dataContext) {
         setLoading(false);
       }
     };
-    const timerRef = { current: null };
+
     if (dataContext && (dataContext.amount !== undefined || dataContext.totalIncome !== undefined)) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(fetchInsight, 500);
+      fetchInsight();
     }
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
   }, [cacheKey, dataContext]);
 
   return { insight, loading };

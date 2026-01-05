@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where, addDoc, setDoc } from 'firebase/firestore';
+import { arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 
@@ -248,23 +248,6 @@ export function OrgProvider({ children }) {
       // Add the new invite
       const nextInvites = [inv, ...invites];
       await updateDoc(ref, { invites: nextInvites });
-
-      // Also write a top-level invite doc for unauthenticated acceptance (publicly readable via rules)
-      try {
-        await setDoc(doc(db, 'invites', inv.token), {
-          id: inv.id,
-          token: inv.token,
-          email: inv.email,
-          role: inv.role,
-          orgId: activeOrgId,
-          organization: safeOrgName(data?.name, activeOrgId),
-          invitedBy: user?.email || 'an admin',
-          createdAt: inv.createdAt,
-          status: 'pending'
-        });
-      } catch (e) {
-        console.debug('set top-level invite failed', e?.message || e);
-      }
       
       // Generate the invitation link
       const link = `${window.location.origin}/invite/${activeOrgId}/${inv.token}`;
@@ -277,17 +260,17 @@ export function OrgProvider({ children }) {
       
       // Method 1: EmailJS (preferred)
       if (
-        (import.meta.env.REACT_APP_EMAILJS_PUBLIC_KEY || import.meta.env.VITE_EMAILJS_PUBLIC_KEY) &&
-        (import.meta.env.REACT_APP_EMAILJS_SERVICE_ID || import.meta.env.VITE_EMAILJS_SERVICE_ID) &&
-        (import.meta.env.REACT_APP_EMAILJS_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID)
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY &&
+        import.meta.env.VITE_EMAILJS_SERVICE_ID &&
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID
       ) {
         try {
           const emailjs = await ensureEmailJs();
           if (emailjs && typeof emailjs.init === 'function') {
-            emailjs.init(import.meta.env.REACT_APP_EMAILJS_PUBLIC_KEY || import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
+            emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
             await emailjs.send(
-              (import.meta.env.REACT_APP_EMAILJS_SERVICE_ID || import.meta.env.VITE_EMAILJS_SERVICE_ID),
-              (import.meta.env.REACT_APP_EMAILJS_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID),
+              import.meta.env.VITE_EMAILJS_SERVICE_ID,
+              import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
               {
                 to_email: inv.email,
                 org_name: safeOrgName(data?.name, activeOrgId),
@@ -308,7 +291,7 @@ export function OrgProvider({ children }) {
       }
       
       // Method 2: Fallback to Firebase Trigger Email
-      if (!emailSent && ((import.meta.env.REACT_APP_USE_FIREBASE_TRIGGER_EMAIL === 'true') || (import.meta.env.VITE_USE_FIREBASE_TRIGGER_EMAIL === 'true'))) {
+      if (!emailSent && import.meta.env.VITE_USE_FIREBASE_TRIGGER_EMAIL === 'true') {
         try {
           const mail = {
             to: [inv.email],
@@ -406,21 +389,6 @@ export function OrgProvider({ children }) {
       return { success: true };
     } catch (e) {
       return { success: false, error: e?.message || 'Failed to update role' };
-    }
-  }
-
-  async function setOrgCurrency(newCurrency) {
-    if (!activeOrgId || !newCurrency) return { success: false };
-    try {
-      const ref = doc(db, 'orgs', activeOrgId);
-      const snap = await getDoc(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const currentSettings = typeof data.orgSettings === 'object' && data.orgSettings !== null ? data.orgSettings : {};
-      const nextSettings = { ...currentSettings, currency: newCurrency };
-      await updateDoc(ref, { orgSettings: nextSettings });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e?.message || 'Failed to update currency' };
     }
   }
 

@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Dialog } from '@headlessui/react';
 import ContributionForm from '../components/ContributionForm';
 import { useFinance } from '../context/FinanceContext';
 import { useOrg } from '../context/OrgContext';
+import { openPaystack } from '../utils/paystack';
 import { useAuth } from '../context/AuthContext';
 import { formatAmount } from '../utils/format';
 import {
@@ -23,10 +25,13 @@ const DonorDashboard = () => {
   const [firstVisit, setFirstVisit] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
+  const [showPayForm, setShowPayForm] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
   const [savingIncome, setSavingIncome] = useState(false);
+  const [startingPay, setStartingPay] = useState(false);
   const [projForm, setProjForm] = useState({ name: '', funderId: '', allocation: '' });
   const [incForm, setIncForm] = useState({ amount: '', walletId: '', projectId: '', description: '' });
+  const [payForm, setPayForm] = useState({ amount: '', walletId: '', projectId: '', email: '' });
   const [formError, setFormError] = useState('');
   const [showContributionForm, setShowContributionForm] = useState(false);
 
@@ -39,8 +44,7 @@ const DonorDashboard = () => {
 
   // No internal menu/sidebar; layout handles header/sidebar
 
-
-  // Add a prominent contribution button in the header
+  // Add a prominent contribution button in the header or near the top
   const renderContributionButton = () => (
     <button
       onClick={() => setShowContributionForm(true)}
@@ -66,31 +70,105 @@ const DonorDashboard = () => {
     } catch {}
   }, [user?.id]);
 
-  // Identify current donor
+  // Identify current donor - match by user ID first, then by email/contact
+  // This ensures invited funders see only their own data
   const donorFunder = useMemo(() => {
-    return byFunder.find(f => f?.funder?.contact === user?.email) || byFunder[0] || null;
+    if (!user?.id) return null;
+    
+    // First try to find by user ID (most reliable)
+    let found = byFunder.find(f => f?.funder?.id === user.id);
+    
+    // If not found, try by email/contact
+    if (!found && user?.email) {
+      found = byFunder.find(f => {
+        const funder = f?.funder;
+        if (!funder) return false;
+        // Check email or contact field
+        return (funder.email && funder.email.toLowerCase() === user.email.toLowerCase()) ||
+               (funder.contact && funder.contact.toLowerCase() === user.email.toLowerCase());
+      });
+    }
+    
+    // Fallback to first funder if still not found (shouldn't happen for invited funders)
+    return found || byFunder[0] || null;
   }, [byFunder, user]);
 
   // Guard empty
   const funderId = donorFunder?.funder?.id;
 
+  // Filter transactions to show ONLY this funder's data
+  // Check both walletId and project-based funderId to ensure all related transactions are shown
   const donorTx = useMemo(() => {
     if (!funderId) return { incomes: [], expenses: [] };
-    const inc = incomes.filter(i => i.status === 'posted' && i.walletId === funderId);
-    const exp = expenses.filter(e => e.status === 'posted' && e.walletId === funderId);
+    
+    const inc = incomes.filter(i => {
+      if (i.status !== 'posted') return false;
+      // Match by walletId directly
+      if (i.walletId === funderId) return true;
+      // Match by project's funderId
+      if (i.projectId) {
+        const proj = projects.find(p => p.id === i.projectId);
+        if (proj && proj.funderId === funderId) return true;
+      }
+      return false;
+    });
+    
+    const exp = expenses.filter(e => {
+      if (e.status !== 'posted') return false;
+      // Match by walletId directly
+      if (e.walletId === funderId) return true;
+      // Match by project's funderId
+      if (e.projectId) {
+        const proj = projects.find(p => p.id === e.projectId);
+        if (proj && proj.funderId === funderId) return true;
+      }
+      return false;
+    });
+    
     return { incomes: inc, expenses: exp };
-  }, [funderId, incomes, expenses]);
+  }, [funderId, incomes, expenses, projects]);
 
   const donorProjects = useMemo(() => {
     if (!funderId) return [];
     const all = projects.filter(p => p.funderId === funderId);
-    if (!search) return all;
+    if (!search) return (
+      <div className="container mx-auto p-4">
+        {/* Add the contribution button in a prominent location */}
+        <div className="mb-6 flex justify-end">
+          {renderContributionButton()}
+        </div>
+
+        {/* Add the modal for the contribution form */}
+        <Dialog
+          open={showContributionForm}
+          onClose={() => setShowContributionForm(false)}
+          className="fixed inset-0 z-50 overflow-y-auto"
+        >
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-30" />
+            
+            {/* This element is to trick the browser into centering the modal contents. */}
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
+              &#8203;
+            </span>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <ContributionForm
+                funderId={donorFunder?.funder?.id}
+                onSuccess={handleContributionSuccess}
+                onClose={() => setShowContributionForm(false)}
+              />
+            </div>
+          </div>
+        </Dialog>
+      </div>
+    );
     const q = search.toLowerCase();
     return all.filter(p => (
       (p.name || '').toLowerCase().includes(q) ||
       String(p.projectName || '').toLowerCase().includes(q)
     ));
-  }, [funderId, projects, search]);
+  }, [funderId, projects, search, donorFunder, showContributionForm, handleContributionSuccess]);
 
   const metrics = useMemo(() => {
     const totalDonated = donorTx.incomes.reduce((s, i) => s + (i.amount || 0), 0);
@@ -326,25 +404,54 @@ const DonorDashboard = () => {
         </div>
       )}
 
-      {/* Contribution Form Modal */}
-      {showContributionForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setShowContributionForm(false)} />
-          <div className="relative z-10">
-            <ContributionForm
-              onSuccess={handleContributionSuccess}
-              onClose={() => setShowContributionForm(false)}
-              funderId={funderId}
-            />
+      {/* Pay with Paystack Modal */}
+      {showPayForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowPayForm(false)} />
+          <div className="relative w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 p-5 shadow-lg">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Contribute via Paystack</h3>
+            {formError && <div className="mb-3 text-xs text-rose-600 dark:text-rose-400">{formError}</div>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs mb-1 text-slate-600 dark:text-slate-300">Amount ({(currency||'KES').toUpperCase()})</label>
+                <input type="number" min="0" step="0.01" value={payForm.amount} onChange={e=>setPayForm(f=>({...f, amount:e.target.value}))} className="w-full text-sm px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-800" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1 text-slate-600 dark:text-slate-300">Email</label>
+                <input type="email" value={payForm.email} onChange={e=>setPayForm(f=>({...f, email:e.target.value}))} className="w-full text-sm px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-800" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1 text-slate-600 dark:text-slate-300">Wallet</label>
+                <select value={payForm.walletId} onChange={e=>setPayForm(f=>({...f, walletId:e.target.value}))} className="w-full text-sm px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-800">
+                  <option value="">Select...</option>
+                  {walletOptions.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs mb-1 text-slate-600 dark:text-slate-300">Project (optional)</label>
+                <select value={payForm.projectId} onChange={e=>setPayForm(f=>({...f, projectId:e.target.value}))} className="w-full text-sm px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-800">
+                  <option value="">None</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={()=>setShowPayForm(false)} className="text-xs px-3 py-1.5 rounded-md ring-1 ring-slate-200 dark:ring-slate-700">Cancel</button>
+              <button disabled={startingPay} onClick={handleStartPaystack} className="text-xs px-3 py-1.5 rounded-md bg-sky-600 text-white disabled:opacity-60">{startingPay ? 'Starting...' : 'Pay with Paystack'}</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Create Income Modal */}
       {showIncomeForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowIncomeForm(false)} />
-          <div className="relative w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 p-5 shadow-lg">
+          <div className="relative w-full max-w-md mx-auto max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-slate-900 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 p-5 shadow-lg">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Record Income</h3>
             {formError && <div className="mb-3 text-xs text-rose-600 dark:text-rose-400">{formError}</div>}
             <div className="space-y-3">
@@ -382,49 +489,9 @@ const DonorDashboard = () => {
           </div>
         </div>
       )}
-
-      {/* Contribution Form Modal */}
-      {showContributionForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setShowContributionForm(false)} />
-          <div className="relative z-10">
-            <ContributionForm
-              onSuccess={handleContributionSuccess}
-              onClose={() => setShowContributionForm(false)}
-              funderId={funderId}
-            />
-          </div>
-        </div>
-      )}
       </div>
     );
   }
-
-  // Handler for Paystack payment
-  const handlePaystackContribute = async () => {
-    setFormError('');
-    if (!incForm.amount || !incForm.walletId || !user?.email) {
-      setFormError('Please enter amount, select wallet, and ensure you are logged in.');
-      return;
-    }
-    try {
-      // Call backend to initiate payment (routes to org subaccount)
-      const res = await fetch('/api/paystack/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: Number(incForm.amount) * 100, // Paystack expects kobo
-          email: user.email,
-          ngo_id: incForm.walletId
-        })
-      });
-      const data = await res.json();
-      if (!data.authorization_url) throw new Error('Failed to get Paystack payment link');
-      window.location.href = data.authorization_url;
-    } catch (err) {
-      setFormError('Could not start payment: ' + err.message);
-    }
-  };
 
   return (
     <div className="p-6 space-y-6">
@@ -439,7 +506,7 @@ const DonorDashboard = () => {
           <input value={search} onChange={(e)=>setSearch(e.target.value)} className="hidden md:block bg-white dark:bg-slate-800 text-sm outline-none placeholder:text-slate-400 w-56 px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700" placeholder="Search (projects, transactions)" />
           <button onClick={() => { setShowProjectForm(true); setFormError(''); }} className="hidden sm:inline-flex items-center text-xs px-2 py-1 rounded-md ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">New Project</button>
           <button onClick={() => { setShowIncomeForm(true); setFormError(''); }} className="hidden sm:inline-flex items-center text-xs px-2 py-1 rounded-md ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">Record Income</button>
-          {renderContributionButton()}
+          <button onClick={() => { setShowPayForm(true); setFormError(''); setPayForm(f=>({ ...f, email: user?.email || '' })); }} className="hidden sm:inline-flex items-center text-xs px-2 py-1 rounded-md bg-sky-600 text-white hover:bg-sky-700">Contribute</button>
         </div>
       </div>
 
@@ -613,20 +680,6 @@ const DonorDashboard = () => {
             </table>
           </div>
         </div>
-
-      {/* Contribution Form Modal */}
-      {showContributionForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setShowContributionForm(false)} />
-          <div className="relative z-10">
-            <ContributionForm
-              onSuccess={handleContributionSuccess}
-              onClose={() => setShowContributionForm(false)}
-              funderId={funderId}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

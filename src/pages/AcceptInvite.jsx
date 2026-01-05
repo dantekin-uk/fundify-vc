@@ -219,7 +219,6 @@ export default function AcceptInvite() {
           members: nextMembers,
           invites: nextInvites,
           funders: nextFunders,
-          orgSettings: { ...(data.orgSettings || {}), currency: 'KES' },
         });
 
         // Also remove top-level invite doc if present
@@ -227,7 +226,7 @@ export default function AcceptInvite() {
 
         // send confirmation email with direct portal link (if mail trigger configured)
         try {
-          const portalLink = `${window.location.origin}/donor/dashboard/${funderObj.id}`;
+          const portalLink = `${window.location.origin}/app/donor-dashboard/${funderObj.id}`;
           const subject = `${orgName}: your funder portal is ready`;
           const mail = {
             to: [funderObj.email || invite?.email].filter(Boolean),
@@ -263,7 +262,6 @@ export default function AcceptInvite() {
             memberships: nextMemberships,
             members: nextMembers,
             invites: nextInvites,
-            orgSettings: { ...(data.orgSettings || {}), currency: 'KES' },
           });
           try { await deleteDoc(doc(db, 'invites', token)); } catch (e2) { /* non-fatal */ }
         } catch (e2) {

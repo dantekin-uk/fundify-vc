@@ -403,7 +403,7 @@ export default function FunderPortal() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                {tx.sign > 0 ? '+' : '-'}{formatAmount(Math.abs(tx.amount), tx.currency || currency)}
+                                {tx.sign > 0 ? '+' : '-'}{formatAmount(Math.abs(tx.amount), currency)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 {projects.find(p => p.id === tx.projectId)?.name || 'N/A'}

@@ -5,14 +5,11 @@ import { CreditCardIcon, BanknotesIcon, TrashIcon, CheckCircleIcon } from '@hero
 import Button from '../components/ui/Button';
 
 const colorOptions = [
-  { name: 'indigo', label: 'Indigo', hex: '#4F46E5' },
+ 
   { name: 'blue', label: 'Blue', hex: '#2563EB' },
-  { name: 'purple', label: 'Purple', hex: '#9333EA' },
   { name: 'green', label: 'Green', hex: '#16A34A' },
-  { name: 'cyan', label: 'Cyan', hex: '#0891B2' },
-  { name: 'pink', label: 'Pink', hex: '#EC4899' },
   { name: 'orange', label: 'Orange', hex: '#EA580C' },
-  { name: 'red', label: 'Red', hex: '#DC2626' }
+  
 ];
 
 export default function Integration() {

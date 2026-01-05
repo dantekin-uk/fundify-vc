@@ -25,7 +25,7 @@ import {
   CreditCardIcon
 } from '@heroicons/react/24/outline';
 import { useTheme } from '../context/ThemeContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
   const location = useLocation();
@@ -34,25 +34,46 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
   const { expenses, incomes, funders } = useFinance();
   const { isDark, toggleTheme } = useTheme();
 
-  const [openGroups, setOpenGroups] = useState({});
+  const [openGroups, setOpenGroups] = useState(() => ({ Recent: false }));
   const toggleGroup = (name) => {
-    setOpenGroups(prev => ({
-      ...Object.keys(prev).reduce((acc, key) => {
-        acc[key] = false; // Close all groups first
+    setOpenGroups(prev => {
+      const next = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = (key === 'Recent') ? prev[key] : false; // preserve Recent state
         return acc;
-      }, {}),
-      [name]: !prev[name] // Toggle the clicked group
-    }));
+      }, {});
+      next[name] = !prev[name];
+      return next;
+    });
   };
 
-  // Close all groups when a non-group item is clicked
+  // Recent routes shown at top (persisted in localStorage)
+  const [recentRoutes, setRecentRoutes] = useState([]);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('recent_routes') || '[]');
+      const normalized = Array.isArray(stored) ? stored : [];
+      // ensure current location is present and recent
+      const current = location.pathname;
+      // sensible defaults when no recent history exists
+      const defaults = ['/app/dashboard/overview', '/app/funders', '/app/projects'];
+      const initial = normalized.length === 0 ? defaults : normalized;
+      const merged = [current, ...initial.filter(r => r !== current)].slice(0, 6);
+      setRecentRoutes(merged);
+      localStorage.setItem('recent_routes', JSON.stringify(merged));
+    } catch (e) {
+      // ignore
+    }
+  }, [location.pathname]);
+
+  // Close all groups when a non-group item is clicked (preserve Recent)
   const closeAllGroups = () => {
-    setOpenGroups(prev => ({
-      ...Object.keys(prev).reduce((acc, key) => {
-        acc[key] = false;
-        return acc;
-      }, {})
-    }));
+    setOpenGroups(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => {
+        if (k !== 'Recent') next[k] = false;
+      });
+      return next;
+    });
   };
 
   const pendingCount = ((expenses || []).filter((e) => e.status === 'pending').length) +
@@ -61,25 +82,76 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
   // Role-based navigation items
   const getNavigationItems = () => {
     const baseItems = [
-      { name: 'Dashboard', href: '/app/dashboard/overview', icon: HomeIcon, roles: ['admin', 'donor'] },
-      { name: 'Income', href: '/app/income', icon: BanknotesIcon, roles: ['admin'] },
-      { name: 'Expenses', href: '/app/expenses', icon: WalletIcon, roles: ['admin'] },
-      { name: 'Reports', href: '/app/reports', icon: ChartBarIcon, roles: ['admin', 'donor'] },
+      // Dashboard group with tabs
       {
-        name: 'Funders', icon: null, roles: ['admin'],
+        name: 'Dashboard', icon: HomeIcon, roles: ['admin', 'donor'],
+        children: [
+          { name: 'Overview', href: '/app/dashboard/overview', icon: HomeIcon, roles: ['admin', 'donor'] },
+          { name: 'Funders', href: '/app/dashboard/funders', icon: UsersIcon, roles: ['admin'] },
+          { name: 'Projects', href: '/app/dashboard/projects', icon: FolderIcon, roles: ['admin','donor'] },
+        ]
+      },
+
+      // Transactions group
+      {
+        name: 'Transactions', icon: BanknotesIcon, roles: ['admin'],
+        children: [
+          { name: 'Income', href: '/app/income', icon: BanknotesIcon, roles: ['admin'] },
+          { name: 'Expenses', href: '/app/expenses', icon: WalletIcon, roles: ['admin'] },
+        ]
+      },
+
+      // Projects group
+      {
+        name: 'Projects', icon: FolderIcon, roles: ['admin','donor'],
+        children: [
+          { name: 'Add Project', href: '/app/projects', icon: PlusIcon, roles: ['admin'] },
+          { name: 'Projects List', href: '/app/projects', icon: FolderIcon, roles: ['admin','donor'] },
+        ]
+      },
+
+      // Reports group
+      {
+        name: 'Reports', icon: ChartBarIcon, roles: ['admin','donor'],
+        children: [
+          { name: 'Overview Reports', href: '/app/reports', icon: ChartBarIcon, roles: ['admin','donor'] },
+        ]
+      },
+
+      // Funders group (existing)
+      {
+        name: 'Funders', icon: UsersIcon, roles: ['admin'],
         children: [
           { name: 'Add Funder', href: '/app/funders/add', icon: PlusIcon, roles: ['admin'] },
           { name: 'Funders List', href: '/app/funders', icon: UsersIcon, roles: ['admin'] },
           { name: 'Funders Portal', href: '/app/funders/portal', icon: GlobeAltIcon, roles: ['admin'] },
         ]
       },
-      { name: 'Projects', href: '/app/projects', icon: FolderIcon, roles: ['admin', 'donor'] },
-      { name: 'Approvals', href: '/app/approvals', icon: ClipboardDocumentCheckIcon, roles: ['admin'], badge: pendingCount },
-      { name: 'Accounts', href: '/app/accounts', icon: IdentificationIcon, roles: ['admin'] },
-      { name: 'Audit', href: '/app/audit', icon: ClipboardDocumentListIcon, roles: ['admin'] },
-      { name: 'Funders Portal', href: '/app/funders/portal', icon: HeartIcon, roles: ['admin', 'donor'] },
-      { name: 'Integration', href: '/app/integration', icon: CreditCardIcon, roles: ['admin', 'donor'] },
-      { name: 'Settings', href: '/app/settings', icon: Cog6ToothIcon, roles: ['admin', 'donor'] },
+
+      // Management group
+      {
+        name: 'Management', icon: FolderIcon, roles: ['admin','donor'],
+        children: [
+          { name: 'Accounts', href: '/app/accounts', icon: IdentificationIcon, roles: ['admin'] },
+          { name: 'Audit', href: '/app/audit', icon: ClipboardDocumentListIcon, roles: ['admin'] },
+        ]
+      },
+
+      // Workflow group
+      {
+        name: 'Workflow', icon: ClipboardDocumentCheckIcon, roles: ['admin'],
+        children: [
+          { name: 'Approvals', href: '/app/approvals', icon: ClipboardDocumentCheckIcon, roles: ['admin'], badge: pendingCount },
+        ]
+      },
+
+      // Integration group
+      {
+        name: 'Integration', icon: CreditCardIcon, roles: ['admin','donor'],
+        children: [
+          { name: 'Payment Integration', href: '/app/integration', icon: CreditCardIcon, roles: ['admin','donor'] },
+        ]
+      },
     ];
 
     // Only keep children if parent role matches
@@ -90,13 +162,42 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
         children: item.children ? filterItems(item.children) : undefined
       }));
 
-    return filterItems(baseItems);
+    const items = filterItems(baseItems);
+
+    // Build a Recent group if we have any recent routes
+    // Build a quick lookup map of href -> { name, icon }
+    const hrefMap = {};
+    const buildMap = (itemsList) => {
+      itemsList.forEach(it => {
+        if (it.href) hrefMap[it.href] = { name: it.name, icon: it.icon };
+        if (it.children) buildMap(it.children);
+      });
+    };
+    buildMap(baseItems);
+    // Always include Settings in hrefMap for Recent display
+    hrefMap['/app/settings'] = { name: 'Settings', icon: Cog6ToothIcon };
+
+    const recentChildren = (recentRoutes || [])
+      .map((p) => {
+        const meta = hrefMap[p] || null;
+        const label = meta ? meta.name : (p.replace('/app/', '').replace(/\//g, ' - ') || p);
+        const icon = meta ? meta.icon : null;
+        return { name: label, href: p, icon };
+      })
+      .filter(Boolean);
+
+    if (recentChildren.length > 0) {
+      items.unshift({ name: 'Recent', icon: null, roles: ['admin', 'donor'], children: recentChildren });
+    }
+
+    return items;
   };
 
   const navigation = getNavigationItems();
 
-  // Auto-open any group if current path is inside one of its children
+  // Auto-open any group if current path is inside one of its children (skip Recent)
   navigation.forEach((item) => {
+    if (item.name === 'Recent') return; // keep Recent collapsed by default and only toggle manually
     if (item.children && Array.isArray(item.children)) {
       const activeInGroup = item.children.some((c) => location.pathname.startsWith(c.href));
       if (activeInGroup && !openGroups[item.name]) {
@@ -110,94 +211,137 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
   };
 
   return (
-    <div className={`flex min-h-0 flex-1 flex-col sidebar-modern pt-6 ${collapsed ? 'w-20' : 'w-64'} transition-all duration-200`}>
+    <div className={`flex min-h-0 flex-1 flex-col sidebar-modern bg-white dark:bg-slate-900 ${collapsed ? 'w-20' : 'w-64'} transition-all duration-300 ease-in-out`}>
       {/* Logo/Brand Section */}
-      <div className={`flex h-24 flex-shrink-0 items-center ${collapsed ? 'justify-center px-4' : 'px-6'}`}>
+      <div className={`flex-shrink-0 border-b border-slate-200 dark:border-slate-700/50 ${collapsed ? 'px-2 py-4 flex items-center justify-center' : 'px-6 py-6'}`}>
         <div className={`w-full ${collapsed ? 'flex items-center justify-center' : ''}`}>
-          <div className={`flex items-center ${collapsed ? '' : 'gap-3'}`}>
-            <div className={`h-10 w-10 ${collapsed ? 'rounded-full' : 'rounded-lg'} flex items-center justify-center text-white font-bold bg-gradient-to-br from-sky-500 to-indigo-600 shadow-sm`}>
-              <span className="text-sm md:text-base" aria-hidden="true">F</span>
+          <Link to="/app/dashboard/overview" onClick={() => { closeAllGroups(); if (onNavigate) onNavigate(); }} className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} group`} aria-label="Go to dashboard">
+            <div className={`h-10 w-10 ${collapsed ? 'rounded-full' : 'rounded-xl'} flex items-center justify-center text-white font-bold bg-gradient-to-br from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 shadow-md group-hover:shadow-lg transition-all duration-200`}>
+              <span className="text-base" aria-hidden="true">F</span>
             </div>
             {!collapsed && (
-              <div className="leading-tight">
-                <div className="text-lg font-extrabold text-gray-900 brand-logo dark:text-slate-100">Fundify</div>
-                <div className="text-xs text-gray-500">Finance dashboard</div>
+              <div className="leading-tight flex-1">
+                <div className="text-base font-bold text-gray-900 brand-logo dark:text-slate-50">Fundify</div>
+                <div className="text-xs text-gray-400 dark:text-slate-400">Finance management</div>
               </div>
             )}
+          </Link>
 
-            {/* Desktop collapse/expand toggle */}
-            {onToggleCollapse && (
-              <div className="ml-auto flex items-center">
-                {!collapsed ? (
-                  <button
-                    type="button"
-                    onClick={onToggleCollapse}
-                    title="Collapse sidebar"
-                    className="ml-3 inline-flex items-center justify-center p-1 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800"
-                    aria-label="Collapse sidebar"
-                  >
-                    <ChevronLeftIcon className="h-5 w-5" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onToggleCollapse}
-                    title="Expand sidebar"
-                    className="ml-3 inline-flex items-center justify-center p-1 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800"
-                    aria-label="Expand sidebar"
-                  >
-                    <ChevronRightIcon className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Desktop collapse/expand toggle */}
+          {onToggleCollapse && !collapsed && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title="Collapse sidebar"
+              className="ml-2 inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-600 dark:hover:text-slate-200 transition-colors"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronLeftIcon className="h-5 w-5" />
+            </button>
+          )}
+          {onToggleCollapse && collapsed && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title="Expand sidebar"
+              className="inline-flex items-center justify-center p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-600 dark:hover:text-slate-200 rounded-lg transition-colors"
+              aria-label="Expand sidebar"
+            >
+              <ChevronRightIcon className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Navigation */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <nav className="flex-1 space-y-2 py-5">
+      <div className="flex flex-1 flex-col overflow-y-auto scrollbar-hide">
+        <nav className="flex-1 space-y-1 py-6 px-3">
           {navigation.map((item) => {
             // Collapsible group
             if (item.children) {
               const isOpen = !!openGroups[item.name];
               const hasActiveChild = item.children.some((c) => location.pathname.startsWith(c.href));
-              return (
-                <div key={item.name} className="sidebar-group my-2">
-                  <div className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide ${collapsed ? 'hidden' : 'text-slate-600 dark:text-slate-200 hover:bg-sky-50/60 dark:hover:bg-slate-800/60'}`} aria-controls={`group-${item.name}`}>
-                    <Link to="/app/funders/portal" onClick={() => { closeAllGroups(); if (onNavigate) onNavigate(); }} className={`flex items-center gap-2 ${hasActiveChild ? 'text-sky-700 dark:text-sky-300' : ''}`}>
-                      {/* Parent acts as a link to the Funders Portal */}
-                      <span>{item.name}</span>
-                    </Link>
-                    <button type="button" onClick={() => toggleGroup(item.name)} aria-expanded={isOpen} className="p-1 rounded-md">
-                      {isOpen ? (
-                        <ChevronDownIcon className="h-4 w-4 text-slate-500" />
-                      ) : (
-                        <ChevronRightIcon className="h-4 w-4 text-slate-500" />
-                      )}
-                    </button>
-                  </div>
-                  {!collapsed && isOpen && (
-                    <div id={`group-${item.name}`}>
+              // When sidebar is collapsed, show Recent children as icon-only grid
+              if (collapsed && item.name === 'Recent') {
+                return (
+                  <div key={item.name} className="sidebar-group px-2 py-4">
+                    <div className="grid grid-cols-3 gap-1.5">
                       {item.children.map((child) => (
                         <Link
-                          key={child.name}
+                          key={child.name + child.href}
                           to={child.href}
+                          title={child.name}
                           onClick={() => { if (onNavigate) onNavigate(); }}
-                          aria-current={location.pathname.startsWith(child.href) ? 'page' : undefined}
-                          className={`flex items-center ml-6 px-3 py-1.5 rounded text-sm gap-2 dark:text-slate-100 text-slate-800 hover:bg-sky-50 dark:hover:bg-slate-800 transition`}
+                          className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-600 active:bg-sky-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-sky-400 dark:active:bg-slate-600 transition-colors duration-150"
                         >
-                          {child.icon && <child.icon className="h-4 w-4 mr-1 text-sky-400" />}
-                          <span>{child.name}</span>
+                          {child.icon ? <child.icon className="h-4 w-4" /> : <span className="h-4 w-4" />}
                         </Link>
                       ))}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Hide other groups when collapsed (except Recent)
+              if (collapsed && item.name !== 'Recent') return null;
+
+              return (
+                <div key={item.name} className="sidebar-group">
+                  <div className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:bg-gray-100/80 dark:hover:bg-slate-800/80 transition-colors duration-150" aria-controls={`group-${item.name}`}>
+                      {/** Determine a sensible parent href: prefer explicit href, otherwise first child's href, otherwise '#' */}
+                      {(() => {
+                        // For groups, clicking the name toggles expansion. For flat items, navigate.
+                        const isGroup = Array.isArray(item.children) && item.children.length > 0;
+                        const parentHref = isGroup ? '#' : (item.href || '#');
+                        const handleParentClick = (e) => {
+                          if (isGroup) {
+                            e.preventDefault();
+                            toggleGroup(item.name);
+                            return;
+                          }
+                          closeAllGroups();
+                          if (onNavigate) onNavigate();
+                        };
+
+                        return (
+                          <a href={parentHref} onClick={handleParentClick} className={`flex items-center gap-2 cursor-pointer transition-colors ${hasActiveChild ? 'text-sky-600 dark:text-sky-400' : ''}`} role="button" tabIndex={0}>
+                            <span>{item.name}</span>
+                          </a>
+                        );
+                      })()}
+                      <button type="button" onClick={() => toggleGroup(item.name)} aria-expanded={isOpen} className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                        <ChevronDownIcon className={`h-4 w-4 text-slate-400 dark:text-slate-500 transform transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
+                      </button>
+                    </div>
+                  {!collapsed && isOpen && (
+                    <div id={`group-${item.name}`} className={`overflow-hidden transition-all duration-200 ${item.name === 'Recent' ? 'ml-2 mt-2 p-2 rounded-lg bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-slate-800/40 dark:to-slate-800/20 border border-sky-100 dark:border-slate-700' : 'mt-2 space-y-1'}`}>
+                      {item.children.map((child) => {
+                        const isActive = location.pathname.startsWith(child.href);
+                        return (
+                          <Link
+                            key={child.name + child.href}
+                            to={child.href}
+                            onClick={() => { if (onNavigate) onNavigate(); }}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={`flex items-center px-3 py-2 rounded-md text-sm gap-2.5 transition-all duration-150 ${
+                              isActive
+                                ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-medium'
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-sky-50/60 dark:hover:bg-slate-700/40'
+                            } ${item.name === 'Recent' ? 'ml-1' : 'ml-3'}`}
+                          >
+                            {child.icon && <child.icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400'}`} />}
+                            <span className="truncate">{child.name}</span>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               );
             }
-            // Default/flat item
+            // Default/flat item - hide when sidebar is collapsed (only show Recent)
+            if (collapsed) return null;
+
             const isActive = location.pathname.startsWith(item.href);
             const isApprovals = item.name === 'Approvals';
             return (
@@ -207,16 +351,19 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
                 onClick={() => { closeAllGroups(); if (onNavigate) onNavigate(); }}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={item.name}
-                className={`nav-item group flex items-center ${collapsed ? 'justify-center py-3 text-gray-600 p-2 rounded-full' : `px-3 py-2 rounded-lg text-sm font-medium text-slate-700 transition ${isActive ? 'active-link shadow-sm' : 'hover:bg-gradient-to-r hover:from-sky-50 hover:to-indigo-50 hover:text-sky-600'}`}`}
+                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  isActive
+                    ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 shadow-sm'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/60'
+                }`}
               >
-                {!collapsed && <span className={`h-8 w-1 rounded-r-full mr-3 ${isActive ? 'bg-sky-600' : 'bg-transparent'}`} />}
-                <div className={`${collapsed ? 'p-2 rounded-full collapsed-icon' : 'mr-3 p-2 rounded-md bg-white/50 nav-icon'}`}>
-                  <item.icon className="h-5 w-5 flex-shrink-0 text-slate-600" aria-hidden="true" />
+                <div className={`p-2 rounded-lg transition-colors ${isActive ? 'bg-sky-200/60 dark:bg-sky-800/40' : 'bg-slate-100 dark:bg-slate-800/40'}`}>
+                  <item.icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-600 dark:text-slate-400'}`} aria-hidden="true" />
                 </div>
-                <div className="flex items-center gap-2 flex-1">
-                  <span className={`${collapsed ? 'hidden' : 'whitespace-nowrap'}`}>{item.name}</span>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="whitespace-nowrap truncate">{item.name}</span>
                   {isApprovals && item.badge > 0 && (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rose-600 text-white">{item.badge}</span>
+                    <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-600 text-white flex-shrink-0">{item.badge}</span>
                   )}
                 </div>
               </Link>
@@ -226,41 +373,74 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
       </div>
 
       {/* Bottom Actions */}
-      <div className={`px-4 py-4 space-y-3 ${collapsed ? 'flex flex-col items-center justify-center' : ''}`}>
-        {/* Theme toggle */}
+      <div className={`flex-shrink-0 border-t border-slate-200 dark:border-slate-700/50 ${collapsed ? 'px-2 py-4 flex flex-col items-center gap-2' : 'px-3 py-4 space-y-2.5'}`}>
+        {/* Action buttons grid when collapsed */}
         {collapsed ? (
-          <button
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label="Toggle dark mode"
-            onClick={toggleTheme}
-            className="w-10 h-10 flex items-center justify-center rounded-md bg-white/90 text-gray-700 hover:bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-700"
-          >
-            {isDark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-          </button>
-        ) : (
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle dark mode"
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-white/90 text-gray-700 hover:bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-700"
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-            <span className="text-sm">{isDark ? 'Light mode' : 'Dark mode'}</span>
-          </button>
-        )}
+          <div className="grid grid-cols-3 gap-1.5 w-full">
+            {/* Theme toggle */}
+            <button
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle dark mode"
+              onClick={toggleTheme}
+              className="h-10 w-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-600 active:bg-sky-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-sky-400 dark:active:bg-slate-600 transition-colors duration-150"
+            >
+              {isDark ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+            </button>
 
-        {/* Sign out */}
-        {user && (
-          collapsed ? (
-            <button title="Sign out" onClick={handleLogout} className="w-10 h-10 flex items-center justify-center rounded-md bg-white text-gray-700 hover:bg-gray-50 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
-              <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+            {/* Settings */}
+            <Link to="/app/settings" onClick={() => { closeAllGroups(); if (onNavigate) onNavigate(); }} title="Settings" className="h-10 w-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-600 active:bg-sky-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-sky-400 dark:active:bg-slate-600 transition-colors duration-150">
+              <Cog6ToothIcon className="h-4 w-4" />
+            </Link>
+
+            {/* Sign out */}
+            {user && (
+              <button title="Sign out" onClick={handleLogout} className="h-10 w-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-rose-100 hover:text-rose-600 active:bg-rose-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-rose-400 dark:active:bg-slate-600 transition-colors duration-150">
+                <ArrowLeftOnRectangleIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* User profile section */}
+            {user && (
+              <div className="px-3 py-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    {(user?.email || user?.name || '?')[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-50 truncate">{user?.name || 'User'}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Theme toggle (expanded) */}
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle dark mode"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-150"
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+              <span className="text-sm font-medium">{isDark ? 'Light' : 'Dark'}</span>
             </button>
-          ) : (
-            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-white text-gray-700 hover:bg-gray-50 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
-              <ArrowLeftOnRectangleIcon className="h-5 w-5" />        
-              Sign out
-            </button>
-          )
+
+            {/* Settings (expanded) */}
+            <Link to="/app/settings" onClick={() => { closeAllGroups(); if (onNavigate) onNavigate(); }} title="Settings" className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-150">
+              <Cog6ToothIcon className="h-4 w-4 flex-shrink-0" />
+              <span className="text-sm font-medium">Settings</span>
+            </Link>
+
+            {/* Sign out (expanded) */}
+            {user && (
+              <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-400 transition-colors duration-150">
+                <ArrowLeftOnRectangleIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm font-medium">Sign out</span>
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -5,18 +5,29 @@ import { uploadFiles } from '../services/cloudinary';
 import { useOrg } from '../context/OrgContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import SuccessAnimation from '../components/ui/SuccessAnimation';
+import { useNavigate } from 'react-router-dom';
+import { markAsRealData } from '../utils/demoDataHelper';
 
 export default function Income() {
   const { projects = [], addIncome, incomes = [], wallets = [], removeItem } = useFinance();
-  const { currency, role } = useOrg();
+  const { currency, role, activeOrgId } = useOrg();
+  const navigate = useNavigate();
   const [projForm, setProjForm] = useState({ projectId: '', amount: '', date: '', description: '' });
   const [orgForm, setOrgForm] = useState({ walletId: 'ORG', amount: '', date: '', description: '' });
   const [projFiles, setProjFiles] = useState([]);
   const [orgFiles, setOrgFiles] = useState([]);
   const [saving1, setSaving1] = useState(false);
   const [saving2, setSaving2] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const canAdd = role === 'admin' || role === 'financial_officer';
+
+  const handleSuccessAnimationComplete = () => {
+    // Navigate to dashboard after animation completes
+    navigate('/app/dashboard');
+  };
 
   const submitProject = async (e) => {
     e.preventDefault();
@@ -32,6 +43,14 @@ export default function Income() {
       if (res?.success === false) {
         alert(res?.error || 'You do not have permission to add income.');
       } else {
+        // Mark organization as having real data (this disables demo mode)
+        await markAsRealData(activeOrgId);
+        
+        // Get project name for success message
+        const projectName = projects.find(p => p.id === projForm.projectId)?.name || 'Project';
+        setSuccessMessage(`Income of ${formatAmount(Number(projForm.amount), currency)} added to ${projectName}!`);
+        setShowSuccessAnimation(true);
+        
         setProjForm({ projectId: '', amount: '', date: '', description: '' });
         setProjFiles([]);
       }
@@ -57,6 +76,14 @@ export default function Income() {
       if (res?.success === false) {
         alert(res?.error || 'You do not have permission to add income.');
       } else {
+        // Mark organization as having real data (this disables demo mode)
+        await markAsRealData(activeOrgId);
+        
+        // Get wallet name for success message
+        const walletName = orgForm.walletId === 'ORG' ? 'Organization' : (wallets.find(w => w.id === orgForm.walletId)?.name || 'Wallet');
+        setSuccessMessage(`Income of ${formatAmount(Number(orgForm.amount), currency)} added to ${walletName}!`);
+        setShowSuccessAnimation(true);
+        
         setOrgForm({ walletId: 'ORG', amount: '', date: '', description: '' });
         setOrgFiles([]);
       }
@@ -209,6 +236,15 @@ export default function Income() {
         </div>
         </CardContent>
       </Card>
+      
+      {/* Success Animation */}
+      <SuccessAnimation
+        show={showSuccessAnimation}
+        message={successMessage}
+        type="income"
+        duration={2500}
+        onComplete={handleSuccessAnimationComplete}
+      />
     </div>
   );
 }

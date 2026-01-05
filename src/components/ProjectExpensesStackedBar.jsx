@@ -4,26 +4,24 @@ import {
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from 'recharts';
 import { useFinance } from '../context/FinanceContext';
 import { useOrg } from '../context/OrgContext';
 import { useTheme } from '../context/ThemeContext';
 
 const PALETTE = [
-  '#6366F1', // indigo
-  '#06B6D4', // cyan
-  '#F59E0B', // amber
-  '#EF4444', // rose
-  '#10B981', // emerald
-  '#0EA5E9', // sky
-  '#8B5CF6', // violet
-  '#84CC16', // lime
-  '#14B8A6', // teal
-  '#F97316', // orange
+  '#2563EB', // indigo
+  '#0EA5E9', // cyan
+  '#06B6D4', // amber
+  '#14B8A6', // rose
+  '#22C55E', // emerald
+  '#10B981', // sky
+  '#A855F7', // violet
+  '#6366F1', // lime
+  '#F59E0B', // teal
+  '#F43F5E', // orange
 ];
 
 function formatCurrency(v, currency = 'USD') {
@@ -60,6 +58,60 @@ const CustomTooltip = ({ active, payload, label, currency }) => {
   }
   return null;
 };
+
+function roundedRectPath(x, y, width, height, r) {
+  const tl = Math.max(0, Math.min(r?.tl || 0, width / 2, height / 2));
+  const tr = Math.max(0, Math.min(r?.tr || 0, width / 2, height / 2));
+  const br = Math.max(0, Math.min(r?.br || 0, width / 2, height / 2));
+  const bl = Math.max(0, Math.min(r?.bl || 0, width / 2, height / 2));
+  return [
+    `M ${x + tl},${y}`,
+    `H ${x + width - tr}`,
+    tr ? `A ${tr},${tr} 0 0 1 ${x + width},${y + tr}` : `L ${x + width},${y}`,
+    `V ${y + height - br}`,
+    br ? `A ${br},${br} 0 0 1 ${x + width - br},${y + height}` : `L ${x + width},${y + height}`,
+    `H ${x + bl}`,
+    bl ? `A ${bl},${bl} 0 0 1 ${x},${y + height - bl}` : `L ${x},${y + height}`,
+    `V ${y + tl}`,
+    tl ? `A ${tl},${tl} 0 0 1 ${x + tl},${y}` : `L ${x},${y}`,
+    'Z',
+  ].join(' ');
+}
+
+function makeCapsuleStackShape({ cat, categoriesVisible, radius, isDark }) {
+  const stroke = isDark ? 'rgba(15, 23, 42, 0.45)' : 'rgba(255, 255, 255, 0.75)';
+  return (props) => {
+    const { x, y, width, height, fill, payload } = props;
+    if (!width || !height) return null;
+    const value = Number(payload?.[cat] || 0);
+    if (!(value > 0)) return null;
+
+    const nonZero = (categoriesVisible || []).filter((c) => Number(payload?.[c] || 0) > 0);
+    const first = nonZero[0];
+    const last = nonZero[nonZero.length - 1];
+    const isBottom = cat === first;
+    const isTop = cat === last;
+
+    const r = {
+      tl: isTop ? radius : 0,
+      tr: isTop ? radius : 0,
+      br: isBottom ? radius : 0,
+      bl: isBottom ? radius : 0,
+    };
+    const d = roundedRectPath(x, y, width, height, r);
+
+    return (
+      <path
+        d={d}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={1}
+        vectorEffect="non-scaling-stroke"
+        filter="url(#barShadowP)"
+      />
+    );
+  };
+}
 
 export default function ProjectExpensesStackedBar({ className = '', timeRange = 'All', compact = false }) {
   const { expenses, projects } = useFinance();
@@ -161,6 +213,8 @@ export default function ProjectExpensesStackedBar({ className = '', timeRange = 
   const angle = data.rows?.length > 6 ? -25 : 0;
   const perProjectWidth = compact ? 28 : 36;
   const minWidth = Math.max(compact ? 380 : 520, (data.rows?.length || 0) * perProjectWidth);
+  const barSize = Math.round((14 * 1.50) * 10) / 10;
+  const capsuleRadius = 50;
 
   // generate color map for categories
   const colors = PALETTE;
@@ -194,8 +248,8 @@ export default function ProjectExpensesStackedBar({ className = '', timeRange = 
                     const c = categoryColors[cat];
                     return (
                       <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={c} stopOpacity="1" />
-                        <stop offset="100%" stopColor={c} stopOpacity="0.75" />
+                        <stop offset="0%" stopColor={c} stopOpacity="0.98" />
+                        <stop offset="100%" stopColor={c} stopOpacity="0.62" />
                       </linearGradient>
                     );
                   })}
@@ -203,14 +257,23 @@ export default function ProjectExpensesStackedBar({ className = '', timeRange = 
                     <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#0ea5e9" floodOpacity="0.07" />
                   </filter>
                 </defs>
-                <CartesianGrid strokeDasharray="2 4" vertical={false} stroke={isDark ? '#334155' : '#e5e7eb'} />
-                <XAxis dataKey="project" tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#475569' }} interval={0} angle={angle} height={angle ? 70 : 50} dy={angle ? 12 : 10} />
-                <YAxis tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#475569' }} tickFormatter={(v) => formatCurrency(v, currency)} />
+                <XAxis dataKey="project" tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#475569' }} tickLine={false} axisLine={false} interval={0} angle={angle} height={angle ? 70 : 50} dy={angle ? 12 : 10} />
+                <YAxis tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#475569' }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v, currency)} />
                 <Tooltip content={<CustomTooltip currency={currency} />} cursor={{ fill: 'rgba(2,132,199,0.06)' }} />
                 {/* Removed default Legend to keep only the styled legend below */}
                 {categoriesVisible.map((cat, i) => {
                   const id = `grad-project-${cat.replace(/\s+/g,'-').replace(/[^a-zA-Z0-9-_]/g,'').toLowerCase()}`;
-                  return <Bar key={cat} dataKey={cat} name={cat} stackId="a" fill={`url(#${id})`} radius={[12, 12, 12, 12]} barSize={14} stroke="#ffffff" strokeWidth={2} filter="url(#barShadowP)" />;
+                  return (
+                    <Bar
+                      key={cat}
+                      dataKey={cat}
+                      name={cat}
+                      stackId="a"
+                      fill={`url(#${id})`}
+                      barSize={barSize}
+                      shape={makeCapsuleStackShape({ cat, categoriesVisible, radius: capsuleRadius, isDark })}
+                    />
+                  );
                 })}
               </BarChart>
             </ResponsiveContainer>

@@ -1,6 +1,5 @@
 
 import crypto from 'crypto';
-import axios from 'axios';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -25,32 +24,15 @@ export default async function handler(req, res) {
   if (!secret && !allowMock) {
     return res.status(500).json({ error: 'Missing PAYSTACK_SECRET_KEY environment variable' });
   }
-  let verifiedEvent = null;
   if (secret) {
-    const raw = JSON.stringify(req.body);
-    const hash = crypto.createHmac('sha512', secret).update(raw).digest('hex');
-    const sig = req.headers['x-paystack-signature'];
-    if (hash !== sig) {
-      try {
-        const ref = req.body?.data?.reference;
-        if (!ref) throw new Error('Missing reference for verification');
-        const resp = await axios.get(`https://api.paystack.co/transaction/verify/${encodeURIComponent(ref)}`, {
-          headers: { Authorization: `Bearer ${secret}` }
-        });
-        if (resp?.data?.status && resp.data?.data?.status === 'success') {
-          verifiedEvent = { event: 'charge.success', data: resp.data.data };
-        } else {
-          console.error('Paystack verify failed or not success', resp?.data);
-          return res.status(401).json({ error: 'Unauthorized: Invalid signature' });
-        }
-      } catch (e) {
-        console.error('Signature verify fallback error', e?.message || e);
-        return res.status(401).json({ error: 'Unauthorized: Signature check failed' });
-      }
+    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+    if (hash !== req.headers['x-paystack-signature']) {
+      console.error('Invalid Paystack signature');
+      return res.status(401).json({ error: 'Unauthorized: Invalid signature' });
     }
   }
 
-  const event = verifiedEvent || req.body;
+  const event = req.body;
 
   if (event.event !== 'charge.success') {
     console.log(`Received non-charge.success event: ${event.event}`);
@@ -69,7 +51,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Bad Request: Missing funderId or orgId in metadata' });
   }
 
-  const amountInMajorUnits = amount / 100;
+  const amountInNaira = amount / 100;
 
   try {
     const orgRef = db.collection('orgs').doc(orgId);
@@ -81,7 +63,7 @@ export default async function handler(req, res) {
 
       const incomeEntry = {
         id: reference,
-        amount: amountInMajorUnits,
+        amount: amountInNaira,
         currency,
         status,
         walletId: funderId,

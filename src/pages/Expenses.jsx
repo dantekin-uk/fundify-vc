@@ -5,22 +5,33 @@ import { uploadFiles } from '../services/cloudinary';
 import { useOrg } from '../context/OrgContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import SuccessAnimation from '../components/ui/SuccessAnimation';
+import { useNavigate } from 'react-router-dom';
+import { markAsRealData } from '../utils/demoDataHelper';
 
 const CATEGORIES = ['Salaries','Operations','Transport','Utilities','Training','Supplies','Other'];
 
 export default function Expenses() {
   const { projects, addExpense, expenses, approveExpense, rejectExpense, wallets, removeItem } = useFinance();
+  const { currency, role, activeOrgId } = useOrg();
+  const navigate = useNavigate();
   // ensure lists are defined to avoid runtime errors when not yet loaded
   const safeProjects = projects || [];
   const safeWallets = wallets || [];
   const safeExpenses = Array.isArray(expenses) ? expenses : [];
-  const { currency, role } = useOrg();
   const [projForm, setProjForm] = useState({ projectId: '', category: 'Operations', amount: '', date: '', description: '' });
   const [walletForm, setWalletForm] = useState({ walletId: 'ORG', category: 'Operations', amount: '', date: '', description: '' });
   const [projFiles, setProjFiles] = useState([]);
   const [walletFiles, setWalletFiles] = useState([]);
   const [saving1, setSaving1] = useState(false);
   const [saving3, setSaving3] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const handleSuccessAnimationComplete = () => {
+    // Navigate to dashboard after animation completes
+    navigate('/app/dashboard');
+  };
 
   const submitProject = async (e) => {
     e.preventDefault();
@@ -36,6 +47,14 @@ export default function Expenses() {
       if (res && res.success === false) {
         alert(res.error || 'Failed to add expense');
       } else {
+        // Mark organization as having real data (this disables demo mode)
+        await markAsRealData(activeOrgId);
+        
+        // Get project name for success message
+        const projectName = safeProjects.find(p => p.id === projForm.projectId)?.name || 'Project';
+        setSuccessMessage(`Expense of ${formatAmount(Number(projForm.amount || 0), currency)} added to ${projectName}!`);
+        setShowSuccessAnimation(true);
+        
         setProjForm({ projectId: '', category: 'Operations', amount: '', date: '', description: '' });
         setProjFiles([]);
       }
@@ -70,6 +89,14 @@ export default function Expenses() {
       if (res && res.success === false) {
         alert(res.error || 'Failed to add expense');
       } else {
+        // Mark organization as having real data (this disables demo mode)
+        await markAsRealData(activeOrgId);
+        
+        // Get wallet name for success message
+        const walletName = walletForm.walletId === 'ORG' ? 'Organization' : (safeWallets.find(w => w.id === walletForm.walletId)?.name || 'Wallet');
+        setSuccessMessage(`Expense of ${formatAmount(Number(walletForm.amount || 0), currency)} added to ${walletName}!`);
+        setShowSuccessAnimation(true);
+        
         setWalletForm({ walletId: 'ORG', category: 'Operations', amount: '', date: '', description: '' });
         setWalletFiles([]);
       }
@@ -247,6 +274,15 @@ export default function Expenses() {
         </div>
         </CardContent>
       </Card>
+      
+      {/* Success Animation */}
+      <SuccessAnimation
+        show={showSuccessAnimation}
+        message={successMessage}
+        type="expense"
+        duration={2500}
+        onComplete={handleSuccessAnimationComplete}
+      />
     </div>
   );
 }

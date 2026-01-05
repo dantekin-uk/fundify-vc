@@ -233,9 +233,9 @@ export default function Funders() {
 
       {/* Add Income Modal */}
       {incomeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIncomeModalOpen(false)} />
-          <div className="relative w-full max-w-md bg-white/95 backdrop-blur rounded-2xl border border-slate-200 shadow-xl p-6 dark:bg-slate-900/90 dark:border-slate-700 dark:text-slate-100">
+          <div className="relative w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto bg-white/95 backdrop-blur rounded-2xl border border-slate-200 shadow-xl p-6 dark:bg-slate-900/90 dark:border-slate-700 dark:text-slate-100">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add income to {incomeWallet?.name}</h3>
             <form onSubmit={async (e) => {
               e.preventDefault();

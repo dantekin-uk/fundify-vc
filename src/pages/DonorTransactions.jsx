@@ -64,7 +64,7 @@ export default function DonorTransactions() {
                 <tr key={r.id} onClick={()=>setModal(r)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30">
                   <td className="py-2 pr-4">{r.date ? new Date(r.date).toLocaleDateString() : '-'}</td>
                   <td className="py-2 pr-4">{r.category || (r.kind==='income'?'Donation':'Expense')}</td>
-                  <td className={`py-2 pr-4 font-medium ${r.kind==='income'?'text-emerald-600':'text-rose-600'}`}>{r.kind==='income'?'+':''}{formatAmount(r.amount||0, r.currency || currency)}</td>
+                  <td className={`py-2 pr-4 font-medium ${r.kind==='income'?'text-emerald-600':'text-rose-600'}`}>{r.kind==='income'?'+':''}{formatAmount(r.amount||0, currency)}</td>
                   <td className="py-2 pr-4">{projects.find(p=>p.id===r.projectId)?.name || '—'}</td>
                   <td className="py-2 pr-4">{r.status || 'posted'}</td>
                   <td className="py-2 pr-4">{r.receiptUrl ? <a href={r.receiptUrl} target="_blank" rel="noreferrer" className="text-sky-600 dark:text-sky-400 hover:underline">View</a> : <span className="text-slate-400">—</span>}</td>
@@ -86,7 +86,7 @@ export default function DonorTransactions() {
               <div><span className="text-slate-500">Type:</span> {modal.kind}</div>
               <div><span className="text-slate-500">Date:</span> {modal.date ? new Date(modal.date).toLocaleString() : '-'}</div>
               <div><span className="text-slate-500">Category:</span> {modal.category || (modal.kind==='income'?'Donation':'Expense')}</div>
-              <div><span className="text-slate-500">Amount:</span> {formatAmount(modal.amount||0, modal.currency || currency)}</div>
+              <div><span className="text-slate-500">Amount:</span> {formatAmount(modal.amount||0, currency)}</div>
               <div><span className="text-slate-500">Project:</span> {projects.find(p=>p.id===modal.projectId)?.name || '—'}</div>
               <div><span className="text-slate-500">Status:</span> {modal.status || 'posted'}</div>
               <div><span className="text-slate-500">Description:</span> {modal.description || '—'}</div>

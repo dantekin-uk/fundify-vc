@@ -20,3 +20,8 @@ FIREBASE_API_KEY = "AIzaSyA3uF3oPuc_Qrre0IniQtf6dRoZ37dMD-k"
 [[env.production.vars]]
 FIREBASE_PROJECT_ID = "fundify-3df97"
 FIREBASE_API_KEY = "AIzaSyA3uF3oPuc_Qrre0IniQtf6dRoZ37dMD-k"
+ 
+ [[env.production.vars]]
+ PAYSTACK_SECRET = "PAYSTACK_SECRET_PLACEHOLDER", 
+ SUPABASE_URL = "https://your.supabase.co", 
+ SUPABASE_SERVICE_ROLE = "SUPABASE_SERVICE_ROLE_KEY" 

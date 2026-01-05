@@ -6,13 +6,14 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 const AuthContext = createContext(null);
 
-// Development fallback: set REACT_APP_DEV_AUTH=true or VITE_DEV_AUTH=true in .env.local to enable a local dev user
-const IS_DEV_AUTH = (import.meta.env.REACT_APP_DEV_AUTH === 'true') || (import.meta.env.VITE_DEV_AUTH === 'true');
+// Development fallback: set VITE_DEV_AUTH=true in .env.local to enable a local dev user
+const IS_DEV_AUTH = import.meta.env.VITE_DEV_AUTH === 'true';
 const DEV_USER = {
-  id: import.meta.env.REACT_APP_DEV_USER_ID || import.meta.env.VITE_DEV_USER_ID || 'dev-uid',
-  email: import.meta.env.REACT_APP_DEV_USER_EMAIL || import.meta.env.VITE_DEV_USER_EMAIL || 'dev@local',
-  name: import.meta.env.REACT_APP_DEV_USER_NAME || import.meta.env.VITE_DEV_USER_NAME || 'Developer',
-  hasCompletedSetup: (import.meta.env.REACT_APP_DEV_USER_SETUP === 'true') || (import.meta.env.VITE_DEV_USER_SETUP === 'true') ? true : true,
+  id: import.meta.env.VITE_DEV_USER_ID || 'dev-uid',
+  email: import.meta.env.VITE_DEV_USER_EMAIL || 'dev@local',
+  name: import.meta.env.VITE_DEV_USER_NAME || 'Developer',
+  hasCompletedSetup: import.meta.env.VITE_DEV_USER_SETUP === 'true' ? true : false,
+  isNewUser: false,
   orgSettings: { currency: 'USD', fiscalYearStartMonth: 1 },
 };
 
@@ -78,21 +79,21 @@ export const AuthProvider = ({ children }) => {
       try {
         const ref = doc(db, 'orgs', u.uid);
         const snap = await getDoc(ref);
-        
-        // If the document doesn't exist, create it with default values
+
+        // If the document doesn't exist, this is a NEW user - set hasCompletedSetup to false
         if (!snap.exists()) {
           const defaultProfile = {
             name: u.email,
             isUserProfile: true,
-            hasCompletedSetup: true, // Set to true by default for existing users
+            hasCompletedSetup: false, // NEW users must complete setup
+            isNewUser: true, // Track that this is a brand new user
+            createdAt: new Date().toISOString(),
             orgSettings: {
               currency: 'USD',
               fiscalYearStartMonth: 1,
-              // Add any other default settings here
             },
-            createdAt: new Date().toISOString()
           };
-          
+
           // Create the document with default values
           await setDoc(ref, defaultProfile);
           setUser({
@@ -107,20 +108,22 @@ export const AuthProvider = ({ children }) => {
             id: u.uid,
             email: u.email,
             name: profile.name || u.email,
-            hasCompletedSetup: profile.hasCompletedSetup ?? true, // Default to true if not set
+            hasCompletedSetup: profile.hasCompletedSetup ?? false, // Default to false if not set
+            isNewUser: profile.isNewUser ?? false, // Track onboarding flow
             orgSettings: profile.orgSettings || { currency: 'USD', fiscalYearStartMonth: 1 },
           };
           setUser(merged);
         }
       } catch (e) {
         console.error('Failed to load user profile', e);
-        // Fallback with hasCompletedSetup: true to avoid setup loop
-        setUser({ 
-          id: u.uid, 
-          email: u.email, 
-          name: u.email, 
-          hasCompletedSetup: true, 
-          orgSettings: { currency: 'USD', fiscalYearStartMonth: 1 } 
+        // Fallback - assume user exists since we hit an error
+        setUser({
+          id: u.uid,
+          email: u.email,
+          name: u.email,
+          hasCompletedSetup: true, // Existing user in case of error
+          isNewUser: false,
+          orgSettings: { currency: 'USD', fiscalYearStartMonth: 1 }
         });
       } finally {
         setLoading(false);
@@ -210,8 +213,15 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await createUserWithEmailAndPassword(auth, email, password);
       const uid = res.user.uid;
-      // allow callers to override profile creation behavior (useful for invite flow)
-      const profileDefaults = { name: name || email, isUserProfile: true, hasCompletedSetup: false, orgSettings: { currency: 'USD', fiscalYearStartMonth: 1 }, createdAt: new Date().toISOString() };
+      // New users - set hasCompletedSetup to false so they must complete onboarding
+      const profileDefaults = {
+        name: name || email,
+        isUserProfile: true,
+        hasCompletedSetup: false, // NEW user must complete setup
+        isNewUser: true, // Track that user just signed up
+        orgSettings: { currency: 'USD', fiscalYearStartMonth: 1 },
+        createdAt: new Date().toISOString()
+      };
       const profile = { ...profileDefaults, ...(options.profile || {}) };
       if (options.createProfile !== false) {
         await setDoc(doc(db, 'orgs', uid), profile);

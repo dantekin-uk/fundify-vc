@@ -4,21 +4,49 @@ import { useFinance } from '../context/FinanceContext';
 import { useOrg } from '../context/OrgContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import SuccessAnimation from '../components/ui/SuccessAnimation';
+import { useNavigate } from 'react-router-dom';
+import { markAsRealData } from '../utils/demoDataHelper';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function Projects() {
   const { funders, addProject, byProject, removeItem } = useFinance();
-  const { role } = useOrg();
+  const { role, currency, activeOrgId } = useOrg();
+  const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', type: 'igp', funderId: '', allocation: '', startDate: '', endDate: '', notes: '' });
   const [saving, setSaving] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const onSubmit = (e) => {
+  const handleSuccessAnimationComplete = () => {
+    // Navigate to dashboard overview after animation completes
+    navigate('/app/dashboard/overview');
+  };
+
+  const onSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
     if (form.type === 'donor' && !form.funderId) return alert('Please select a funder for funder-funded project');
     setSaving(true);
-    addProject({ ...form, allocation: Number(form.allocation || 0) });
-    setForm({ name: '', type: 'igp', funderId: '', allocation: '', startDate: '', endDate: '', notes: '' });
-    setTimeout(() => setSaving(false), 200);
+    try {
+      addProject({ ...form, allocation: Number(form.allocation || 0) });
+      
+      // Mark organization as having real data (this disables demo mode)
+      await markAsRealData(activeOrgId);
+      
+      // Show success animation
+      const allocationText = form.allocation ? ` with budget ${formatAmount(Number(form.allocation || 0), currency)}` : '';
+      setSuccessMessage(`Project "${form.name}" created successfully${allocationText}!`);
+      setShowSuccessAnimation(true);
+      
+      setForm({ name: '', type: 'igp', funderId: '', allocation: '', startDate: '', endDate: '', notes: '' });
+    } catch (err) {
+      console.error('create project failed', err);
+      alert('Failed to create project: ' + (err?.message || 'unknown'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const rows = useMemo(() => byProject, [byProject]);
@@ -124,6 +152,15 @@ export default function Projects() {
         </div>
         </CardContent>
       </Card>
+      
+      {/* Success Animation */}
+      <SuccessAnimation
+        show={showSuccessAnimation}
+        message={successMessage}
+        type="project"
+        duration={2500}
+        onComplete={handleSuccessAnimationComplete}
+      />
     </div>
   );
 }

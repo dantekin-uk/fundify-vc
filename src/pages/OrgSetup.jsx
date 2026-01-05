@@ -1,447 +1,324 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { formatAmount } from '../utils/format';
 import Button from '../components/ui/Button';
+import { Building2, FileText, DollarSign, Calendar, TrendingUp } from 'lucide-react';
 
-const sectors = ['NGO', 'Nonprofit', 'SME', 'Social Enterprise', 'Other'];
-const fundingTypes = ['Grant', 'Donation', 'Internal Project', 'Other'];
-const defaultCategories = ['Salaries', 'Office Rent', 'Utilities', 'Transport'];
+// Fiscal year end options (common for NGOs)
+const fiscalYearEnds = [
+  { value: '12-31', label: 'December 31' },
+  { value: '06-30', label: 'June 30' },
+  { value: '03-31', label: 'March 31' },
+  { value: '09-30', label: 'September 30' },
+];
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
+// Primary funding models
+const fundingModels = [
+  { value: 'grant_dependent', label: 'Grant Dependent', description: 'Primarily funded through grants and donor contributions' },
+  { value: 'self_sustaining', label: 'Self-Sustaining Projects', description: 'Revenue-generating programs and social enterprises' },
+  { value: 'hybrid', label: 'Hybrid', description: 'Mix of grants and self-generated revenue' },
+];
+
+// Currencies (prioritizing African markets)
+const currencies = [
+  { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
+  { code: 'GHS', symbol: '₵', name: 'Ghanaian Cedi' },
+  { code: 'UGX', symbol: 'USh', name: 'Ugandan Shilling' },
+  { code: 'TZS', symbol: 'TSh', name: 'Tanzanian Shilling' },
+  { code: 'ETB', symbol: 'Br', name: 'Ethiopian Birr' },
+  { code: 'RWF', symbol: 'RF', name: 'Rwandan Franc' },
+];
 
 export default function OrgSetup() {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
 
-  const [step, setStep] = useState(1);
-  const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState({});
-
-  // Step 1 – Organization Details
-  const [orgDetails, setOrgDetails] = useState({
-    name: user?.name || '',
-    sector: sectors[0],
-    country: '',
-    currency: user?.orgSettings?.currency || 'USD',
+  const [formData, setFormData] = useState({
+    legalName: user?.name || '',
+    currency: user?.orgSettings?.currency || 'KES',
+    fiscalYearEnd: '12-31',
+    fundingModel: 'grant_dependent',
   });
 
-  // Step 2 – Funding Sources
-  const [funders, setFunders] = useState([
-    { id: uid(), name: '', type: fundingTypes[0], initialBalance: '' },
-  ]);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  // Step 3 – Projects Setup
-  const [projects, setProjects] = useState([]);
-
-  // Step 4 – Internal Operations
-  const [internalCategories, setInternalCategories] = useState([...defaultCategories]);
-
-  const totalSteps = 5;
-  const progress = useMemo(() => Math.round(((step - 1) / (totalSteps - 1)) * 100), [step]);
-
-  const validateStep = (s) => {
-    const e = {};
-    if (s === 1) {
-      if (!orgDetails.name.trim()) e.name = 'Organization name is required';
-      if (!orgDetails.country.trim()) e.country = 'Country is required';
-      if (!orgDetails.currency.trim()) e.currency = 'Currency is required';
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: null }));
     }
-    if (s === 2) {
-      const hasAtLeastOne = funders.some((f) => f.name.trim());
-      if (!hasAtLeastOne) e.funders = 'Add at least one funder/donor';
-    }
-    setErrors(e);
-    return Object.keys(e).length === 0;
   };
 
-  const next = () => {
-    if (!validateStep(step)) return;
-    setStep((x) => Math.min(totalSteps, x + 1));
+  const validate = () => {
+    const newErrors = {};
+    
+    if (!formData.legalName.trim()) {
+      newErrors.legalName = 'Organization legal name is required';
+    } else if (formData.legalName.trim().length < 3) {
+      newErrors.legalName = 'Organization name must be at least 3 characters';
+    }
+
+    if (!formData.currency) {
+      newErrors.currency = 'Base reporting currency is required';
+    }
+
+    if (!formData.fiscalYearEnd) {
+      newErrors.fiscalYearEnd = 'Fiscal year end is required';
+    }
+
+    if (!formData.fundingModel) {
+      newErrors.fundingModel = 'Primary funding model is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
-  const back = () => setStep((x) => Math.max(1, x - 1));
-  const skip = () => setStep((x) => Math.min(totalSteps, x + 1));
 
-  const addFunder = () => setFunders((arr) => [...arr, { id: uid(), name: '', type: fundingTypes[0], initialBalance: '' }]);
-  const removeFunder = (id) => setFunders((arr) => arr.filter((f) => f.id !== id));
-
-  const addProject = () => setProjects((arr) => [...arr, { id: uid(), name: '', funderId: funders[0]?.id || '', budget: '', startDate: '', endDate: '' }]);
-  const removeProject = (id) => setProjects((arr) => arr.filter((p) => p.id !== id));
-
-  const addCategory = () => setInternalCategories((arr) => [...arr, '']);
-  const removeCategory = (idx) => setInternalCategories((arr) => arr.filter((_, i) => i !== idx));
-
-  const onConfirm = async () => {
-    if (!validateStep(1) || !validateStep(2)) {
-      setStep(1);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validate()) {
       return;
     }
+
     setSaving(true);
     try {
-      const cleanFunders = funders
-        .filter((f) => f.name.trim())
-        .map((f) => ({ id: f.id, name: f.name.trim(), type: f.type, initialBalance: Number(f.initialBalance || 0) }));
-
-      const funderIds = new Set(cleanFunders.map((f) => f.id));
-      const cleanProjects = projects
-        .filter((p) => p.name.trim() && (!p.funderId || funderIds.has(p.funderId)))
-        .map((p) => ({
-          id: p.id,
-          name: p.name.trim(),
-          funderId: p.funderId || '',
-          budget: Number(p.budget || 0),
-          startDate: p.startDate || '',
-          endDate: p.endDate || '',
-        }));
-
-      const cleanCategories = internalCategories.map((c) => c.trim()).filter(Boolean);
+      // Parse fiscal year end
+      const [month, day] = formData.fiscalYearEnd.split('-');
+      const fiscalYearStartMonth = month === '12' ? 1 : parseInt(month) + 1;
 
       await updateUser({
-        name: orgDetails.name.trim(),
-        sector: orgDetails.sector,
-        country: orgDetails.country.trim(),
-        orgSettings: { currency: orgDetails.currency },
-        funders: cleanFunders,
-        projects: cleanProjects,
-        internalCategories: cleanCategories,
+        name: formData.legalName.trim(),
+        orgSettings: {
+          currency: formData.currency,
+          fiscalYearStartMonth: fiscalYearStartMonth,
+          fiscalYearEnd: formData.fiscalYearEnd,
+        },
+        fundingModel: formData.fundingModel,
         hasCompletedSetup: true,
+        isNewUser: false, // User has completed onboarding setup
+        setupCompletedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      setSaving(false);
-      navigate('/');
+
+      // Navigate to dashboard with demo mode initialized
+      navigate('/app/dashboard/overview');
     } catch (e) {
+      console.error('Setup save error:', e);
+      setErrors({ submit: 'Failed to initialize workspace. Please check your connection and try again.' });
+    } finally {
       setSaving(false);
-      // Silently handled by context; provide minimal feedback here
-      alert('Failed to save. Please try again.');
     }
   };
 
+  const selectedCurrency = currencies.find(c => c.code === formData.currency);
+  const selectedFundingModel = fundingModels.find(m => m.value === formData.fundingModel);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F9FAFB] relative overflow-hidden py-10 px-4 dark:bg-slate-950">
-      {/* Decorative background blobs */}
-      <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-32 -top-24 w-96 h-96 bg-gradient-to-tr from-gray-100 to-gray-200 opacity-60 rounded-full filter blur-3xl transform rotate-12 animate-pulse" />
-        <div className="absolute -right-24 -bottom-20 w-80 h-80 bg-gradient-to-br from-gray-100 to-gray-200 opacity-50 rounded-full filter blur-2xl transform -rotate-12" />
-        <svg className="absolute right-0 top-0 -mt-20 -mr-20 w-[600px] opacity-10" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g transform="translate(300,300)">
-            <path d="M120,-160C150,-120,170,-80,180,-40C190,0,190,40,170,80C150,120,120,160,80,180C40,200,0,200,-40,190C-80,180,-120,160,-150,120C-180,80,-200,40,-200,0C-200,-40,-180,-80,-150,-120C-120,-160,-80,-190,-40,-200C0,-210,40,-200,80,-180C120,-160,120,-160,120,-160Z" fill="#1E3A8A" />
-          </g>
-        </svg>
-        <div className="absolute left-10 top-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-pink-100 via-purple-100 to-indigo-100 opacity-30 rounded-full filter blur-2xl animate-pulse" />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 opacity-30 dark:opacity-10">
+        <div className="absolute inset-0" style={{
+          backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
+          backgroundSize: '24px 24px'
+        }} />
       </div>
-
-      <div className="w-full max-w-3xl bg-white/80 supports-[backdrop-filter]:bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl ring-1 ring-black/5 dark:bg-slate-900/80 dark:supports-[backdrop-filter]:bg-slate-900/60 dark:ring-slate-700 dark:text-slate-100 dark:shadow-none">
-        <div className="px-6 sm:px-8 pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-500 dark:text-slate-400">Step {step} of {totalSteps}</div>
-              <h2 className="text-2xl font-bold text-gray-900 mt-1 dark:text-slate-100">Organization Setup</h2>
-            </div>
+      
+      <div className="relative w-full max-w-2xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 dark:bg-slate-800 mb-4">
+            <Building2 className="w-8 h-8 text-white" />
           </div>
-
-          <div className="mt-4 h-2 w-full bg-gray-100 rounded-full overflow-hidden dark:bg-slate-800">
-            <div className="h-full brand-accent transition-all" style={{ width: `${progress}%` }} />
-          </div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Initialize Organization Ledger
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400 text-lg">
+            Configure your financial management workspace
+          </p>
         </div>
 
-        <div className="px-6 sm:px-8 py-6">
-          {step === 1 && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Organization Name</label>
-                <input
-                  className={`w-full border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700`}
-                  value={orgDetails.name}
-                  onChange={(e) => setOrgDetails({ ...orgDetails, name: e.target.value })}
-                />
-                {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-rose-300">{errors.name}</p>}
+        {/* Main Form Card */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <form onSubmit={handleSubmit} className="p-8 space-y-8">
+            {/* Error Message */}
+            {errors.submit && (
+              <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded">
+                <p className="text-sm text-red-700 dark:text-red-300">{errors.submit}</p>
               </div>
+            )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Sector</label>
-                  <select
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                    value={orgDetails.sector}
-                    onChange={(e) => setOrgDetails({ ...orgDetails, sector: e.target.value })}
-                  >
-                    {sectors.map((s) => (
-                      <option value={s} key={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Country</label>
-                  <input
-                    className={`w-full border ${errors.country ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700`}
-                    value={orgDetails.country}
-                    onChange={(e) => setOrgDetails({ ...orgDetails, country: e.target.value })}
-                  />
-                  {errors.country && <p className="mt-1 text-sm text-red-600 dark:text-rose-300">{errors.country}</p>}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Currency</label>
-                <select
-                  className={`w-full border ${errors.currency ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700`}
-                  value={orgDetails.currency}
-                  onChange={(e) => setOrgDetails({ ...orgDetails, currency: e.target.value })}
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="KES">KES (KSh)</option>
-                  <option value="NGN">NGN (₦)</option>
-                </select>
-                {errors.currency && <p className="mt-1 text-sm text-red-600 dark:text-rose-300">{errors.currency}</p>}
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
+            {/* Organization Legal Name */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Funding Sources</h3>
-                <Button size="sm" onClick={addFunder}>Add Funder</Button>
-              </div>
-              {errors.funders && <p className="mb-3 text-sm text-red-600 dark:text-rose-300">{errors.funders}</p>}
-              <div className="space-y-4">
-                {funders.map((f, idx) => (
-                  <div key={f.id} className="rounded-lg border border-gray-200 p-4 bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100">
-                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                      <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Funder/Donor Name</label>
-                        <input
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={f.name}
-                          onChange={(e) => setFunders((arr) => arr.map((x) => (x.id === f.id ? { ...x, name: e.target.value } : x)))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Funding Type</label>
-                        <select
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={f.type}
-                          onChange={(e) => setFunders((arr) => arr.map((x) => (x.id === f.id ? { ...x, type: e.target.value } : x)))}
-                        >
-                          {fundingTypes.map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Initial Balance (optional)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={f.initialBalance}
-                          onChange={(e) => setFunders((arr) => arr.map((x) => (x.id === f.id ? { ...x, initialBalance: e.target.value } : x)))}
-                        />
-                      </div>
-                      <div className="flex items-end justify-end">
-                        {funders.length > 1 && (
-                          <Button variant="outline" size="sm" onClick={() => removeFunder(f.id)}>Remove</Button>
-                        )}
-                      </div>
-                    </div>
-                    {idx === funders.length - 1 && (
-                      <div className="mt-3">
-                        <button onClick={addFunder} className="text-sm text-sky-700 hover:underline">+ Add another funder</button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Projects Setup (optional)</h3>
-                <div className="space-x-2">
-                  <Button onClick={addProject} disabled={funders.filter((f)=>f.name.trim()).length === 0} size="sm">Add Project</Button>
-                  <Button variant="secondary" size="sm" onClick={skip}>Skip for now</Button>
-                </div>
-              </div>
-              {funders.filter((f)=>f.name.trim()).length === 0 && (
-                <p className="text-sm text-gray-600 mb-3 dark:text-slate-400">Add at least one funder in the previous step to tie projects.</p>
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <FileText className="w-4 h-4" />
+                Organization Legal Name
+              </label>
+              <input
+                type="text"
+                value={formData.legalName}
+                onChange={(e) => handleChange('legalName', e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg border ${
+                  errors.legalName 
+                    ? 'border-red-500 focus:ring-red-500' 
+                    : 'border-slate-300 dark:border-slate-700 focus:border-slate-900 dark:focus:border-slate-500'
+                } bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-500 transition-colors`}
+                placeholder="e.g., Community Development Initiative"
+                autoFocus
+              />
+              {errors.legalName && (
+                <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{errors.legalName}</p>
               )}
-              <div className="space-y-4">
-                {projects.map((p) => (
-                  <div key={p.id} className="rounded-lg border border-gray-200 p-4 bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100">
-                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
-                      <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Project Name</label>
-                        <input
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={p.name}
-                          onChange={(e) => setProjects((arr) => arr.map((x) => (x.id === p.id ? { ...x, name: e.target.value } : x)))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Funder</label>
-                        <select
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={p.funderId}
-                          onChange={(e) => setProjects((arr) => arr.map((x) => (x.id === p.id ? { ...x, funderId: e.target.value } : x)))}
-                        >
-                          <option value="">Select funder</option>
-                          {funders.filter((f)=>f.name.trim()).map((f) => (
-                            <option key={f.id} value={f.id}>{f.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Budget</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={p.budget}
-                          onChange={(e) => setProjects((arr) => arr.map((x) => (x.id === p.id ? { ...x, budget: e.target.value } : x)))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Start</label>
-                        <input
-                          type="date"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={p.startDate}
-                          onChange={(e) => setProjects((arr) => arr.map((x) => (x.id === p.id ? { ...x, startDate: e.target.value } : x)))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">End</label>
-                        <input
-                          type="date"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                          value={p.endDate}
-                          onChange={(e) => setProjects((arr) => arr.map((x) => (x.id === p.id ? { ...x, endDate: e.target.value } : x)))}
-                        />
-                      </div>
-                      <div className="flex items-end justify-end">
-                        <Button variant="outline" size="sm" onClick={() => removeProject(p.id)}>Remove</Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {projects.length === 0 && (
-                  <div className="text-sm text-gray-600 dark:text-slate-400">No projects added yet.</div>
-                )}
-              </div>
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                This is the official name that will appear on all financial reports and compliance documents.
+              </p>
             </div>
-          )}
 
-          {step === 4 && (
+            {/* Base Reporting Currency */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Internal Operations (optional)</h3>
-                <div className="space-x-2">
-                  <Button size="sm" onClick={addCategory}>Add Category</Button>
-                  <Button variant="secondary" size="sm" onClick={skip}>Skip for now</Button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {internalCategories.map((c, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <input
-                      className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:focus:ring-slate-700"
-                      value={c}
-                      onChange={(e) => setInternalCategories((arr) => arr.map((x, i) => (i === idx ? e.target.value : x)))}
-                    />
-                    <Button variant="outline" size="sm" onClick={() => removeCategory(idx)}>Remove</Button>
-                  </div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <DollarSign className="w-4 h-4" />
+                Base Reporting Currency
+              </label>
+              <select
+                value={formData.currency}
+                onChange={(e) => handleChange('currency', e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg border ${
+                  errors.currency 
+                    ? 'border-red-500 focus:ring-red-500' 
+                    : 'border-slate-300 dark:border-slate-700 focus:border-slate-900 dark:focus:border-slate-500'
+                } bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-500 transition-colors`}
+              >
+                {currencies.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.code} ({currency.symbol}) - {currency.name}
+                  </option>
                 ))}
-                {internalCategories.length === 0 && (
-                  <div className="text-sm text-gray-600 dark:text-slate-400">No categories added yet.</div>
-                )}
-              </div>
+              </select>
+              {errors.currency && (
+                <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{errors.currency}</p>
+              )}
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                This currency will be used for all Board Reports and financial statements. Multi-currency support can be configured later.
+              </p>
             </div>
-          )}
 
-          {step === 5 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Review & Finish</h3>
-              <div className="rounded-lg border border-gray-200 dark:border-slate-700 dark:bg-slate-900/70">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
-                  <div className="p-4 border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-slate-700">
-                    <div className="text-sm text-gray-500 dark:text-slate-400">Organization</div>
-                    <div className="mt-2 text-gray-900 dark:text-slate-100">
-                      <div className="font-medium">{orgDetails.name}</div>
-                      <div className="text-sm text-gray-600 dark:text-slate-300">{orgDetails.sector} • {orgDetails.country}</div>
-                      <div className="text-sm text-gray-600 dark:text-slate-300">Currency: {orgDetails.currency}</div>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="text-sm text-gray-500 dark:text-slate-400">Internal Operations</div>
-                    <div className="mt-2 text-gray-900 text-sm dark:text-slate-100">
-                      {internalCategories.length ? internalCategories.join(', ') : 'None'}
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4 border-t border-gray-200 dark:border-slate-700">
-                  <div className="text-sm text-gray-500 mb-2 dark:text-slate-400">Funders</div>
-                  {funders.filter((f)=>f.name.trim()).length ? (
-                    <div className="space-y-1">
-                      {funders.filter((f)=>f.name.trim()).map((f) => (
-                        <div key={f.id} className="text-sm text-gray-900 dark:text-slate-100">{f.name} — {f.type} {f.initialBalance ? `• ${formatAmount(Number(f.initialBalance || 0))}` : ''}</div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-600 dark:text-slate-400">None</div>
-                  )}
-                </div>
-                <div className="p-4 border-t border-gray-200 dark:border-slate-700">
-                  <div className="text-sm text-gray-500 mb-2 dark:text-slate-400">Projects</div>
-                  {projects.filter((p)=>p.name.trim()).length ? (
-                    <div className="space-y-1">
-                      {projects.filter((p)=>p.name.trim()).map((p) => (
-                        <div key={p.id} className="text-sm text-gray-900 dark:text-slate-100">
-                          {p.name} — {funders.find((f)=>f.id===p.funderId)?.name || 'No funder'} {p.budget ? `• ${formatAmount(Number(p.budget || 0))}` : ''}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-600 dark:text-slate-400">None</div>
-                  )}
-                </div>
-              </div>
+            {/* Fiscal Year End */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <Calendar className="w-4 h-4" />
+                Fiscal Year End
+              </label>
+              <select
+                value={formData.fiscalYearEnd}
+                onChange={(e) => handleChange('fiscalYearEnd', e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg border ${
+                  errors.fiscalYearEnd 
+                    ? 'border-red-500 focus:ring-red-500' 
+                    : 'border-slate-300 dark:border-slate-700 focus:border-slate-900 dark:focus:border-slate-500'
+                } bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-500 transition-colors`}
+              >
+                {fiscalYearEnds.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {errors.fiscalYearEnd && (
+                <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{errors.fiscalYearEnd}</p>
+              )}
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                Select when your organization's fiscal year ends. This determines reporting periods and budget cycles.
+              </p>
             </div>
-          )}
-        </div>
 
-        <div className="px-6 sm:px-8 pb-6 flex items-center justify-between">
-          <div>
-            {step > 1 && (
-              <Button variant="outline" onClick={back}>Back</Button>
-            )}
-          </div>
-          <div className="space-x-2">
-            {step < 5 && (
-              <>
-                {step === 3 && (
-                  <Button variant="secondary" onClick={skip}>Skip for now</Button>
+            {/* Primary Funding Model */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                <TrendingUp className="w-4 h-4" />
+                Primary Funding Model
+              </label>
+              <div className="space-y-3">
+                {fundingModels.map((model) => (
+                  <label
+                    key={model.value}
+                    className={`relative flex items-start p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      formData.fundingModel === model.value
+                        ? 'border-slate-900 dark:border-slate-500 bg-slate-50 dark:bg-slate-800/50'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="fundingModel"
+                      value={model.value}
+                      checked={formData.fundingModel === model.value}
+                      onChange={(e) => handleChange('fundingModel', e.target.value)}
+                      className="sr-only"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">
+                        {model.label}
+                      </div>
+                      <div className="text-sm text-slate-600 dark:text-slate-400">
+                        {model.description}
+                      </div>
+                    </div>
+                    <div className={`ml-4 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      formData.fundingModel === model.value
+                        ? 'border-slate-900 dark:border-slate-500'
+                        : 'border-slate-300 dark:border-slate-600'
+                    }`}>
+                      {formData.fundingModel === model.value && (
+                        <div className="w-3 h-3 rounded-full bg-slate-900 dark:bg-slate-500" />
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {errors.fundingModel && (
+                <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{errors.fundingModel}</p>
+              )}
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                This helps us configure default workflows and reporting templates for your organization type.
+              </p>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+              <Button
+                type="submit"
+                disabled={saving}
+                className="w-full justify-center py-3 text-base font-semibold"
+                variant="primary"
+              >
+                {saving ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Initializing Workspace...
+                  </>
+                ) : (
+                  <>
+                    Initialize Workspace
+                    <Building2 className="w-4 h-4 ml-2" />
+                  </>
                 )}
-                {step === 4 && (
-                  <Button variant="secondary" onClick={skip}>Skip for now</Button>
-                )}
-                <Button onClick={next}>Next</Button>
-              </>
-            )}
-            {step === 5 && (
-              <Button variant="success" onClick={onConfirm} disabled={saving}>
-                {saving ? 'Saving...' : 'Confirm & Go to Dashboard'}
               </Button>
-            )}
-          </div>
+            </div>
+          </form>
         </div>
+
+        {/* Footer Note */}
+        <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          You can configure additional settings, funding sources, and projects after initialization.
+        </p>
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { useTheme } from '../context/ThemeContext';
 import { useFinancialInsight } from '../hooks/useFinancialInsight';
-import { insightSource } from '../services/geminiInsights';
+
 
 /* --------------------------------------------------------
    CONFIG
@@ -35,6 +35,7 @@ export default function StatCard({
   series = [],
   variant = 'funds',
   className = '',
+  compact = false,
   rawValue = 0,
   currency = 'USD',
   topExpenseCategories = [],
@@ -56,11 +57,11 @@ export default function StatCard({
 
   // Icon colors per variant
   const iconColors = {
-    funds: "#2563eb",      // blue
-    income: "#059669",     // green
-    expenses: "#e11d48",   // red
-    budget: "#d97706",     // amber
-    balance: "#06b6d4"     // cyan
+    funds: "#2563EB",      // blue
+    income: "#10B981",     // green
+    expenses: "#F43F5E",   // rose
+    budget: "#F59E0B",     // amber
+    balance: "#06B6D4"     // cyan
   };
   // Card name color
   const nameColor = "#2563eb";
@@ -141,48 +142,40 @@ export default function StatCard({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br shadow-lg transition-all duration-300 ${className}`}
+      className={`group relative overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-0.5 ${className}`}
       style={{
-        minHeight: 260,
+        minHeight: compact ? 180 : 240,
         padding: 0,
-        boxShadow: '0 4px 20px 0 rgba(0,0,0,0.08)',
         cursor: 'pointer',
-        background: isDark
-          ? `linear-gradient(135deg, #1e293b 0%, #0f172a 100%)`
-          : `linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)`,
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = '0 8px 32px 0 rgba(37,99,235,0.16)';
-        e.currentTarget.style.transform = 'translateY(-4px)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.boxShadow = '0 4px 20px 0 rgba(0,0,0,0.08)';
-        e.currentTarget.style.transform = 'none';
+        aspectRatio: '4 / 3',
       }}
     >
 
-      <div className="relative p-6 sm:p-8 flex flex-col justify-between min-h-[260px]">
-        {/* Top Header: Icon + Title (left) and Timeframe Dropdown (right) */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div
-              className="h-8 w-8 flex items-center justify-center rounded-lg flex-shrink-0"
-              style={{
-                background: `${iconColors[variant] || "#2563eb"}15`,
-              }}
-            >
-              <Icon className="h-5 w-5" style={{ color: iconColors[variant] || "#2563eb" }} />
-            </div>
-            <p className="text-xs uppercase tracking-widest font-semibold opacity-70 truncate" style={{ color: iconColors[variant] || "#2563eb" }}>
-              {safeTitle}
-            </p>
-          </div>
+      {/* Soft, borderless fintech background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: isDark
+            ? `linear-gradient(135deg, rgba(30,41,59,0.75) 0%, rgba(15,23,42,0.55) 100%)`
+            : `linear-gradient(135deg, rgba(255,255,255,0.75) 0%, rgba(248,250,252,0.55) 100%)`,
+        }}
+      />
+      <div
+        className="absolute -right-10 -top-10 h-32 w-32 rounded-full blur-3xl"
+        style={{ background: `${iconColors[variant] || "#2563EB"}22` }}
+      />
+      <div
+        className="absolute -left-10 -bottom-10 h-32 w-32 rounded-full blur-3xl"
+        style={{ background: `${iconColors[variant] || "#2563EB"}12` }}
+      />
 
-          {/* Timeframe Dropdown Selector */}
-          <div className="relative ml-2 flex-shrink-0">
+      <div className={`relative ${compact ? 'p-4' : 'p-5 sm:p-6'}`}>
+        {/* Time range button - top right corner */}
+        <div className="absolute top-2 right-2 z-20">
+          <div className="relative">
             <button
               onClick={() => setShowRangeMenu(!showRangeMenu)}
-              className="h-9 w-9 flex items-center justify-center rounded-full font-semibold text-xs transition-all shadow-sm"
+              className={`${compact ? 'h-7 w-7' : 'h-8 w-8'} flex items-center justify-center rounded-full font-semibold text-xs transition-all shadow-sm`}
               style={{
                 background: isDark ? "rgba(0,0,0,0.3)" : "#e8f4f8",
                 color: isDark ? "#cbd5e1" : iconColors[variant] || "#2563eb",
@@ -194,7 +187,7 @@ export default function StatCard({
             </button>
             {showRangeMenu && (
               <div
-                className="absolute top-full right-0 mt-2 rounded-lg shadow-xl z-10 min-w-max"
+                className="absolute top-full right-0 mt-1 rounded-lg shadow-xl z-30 min-w-max"
                 style={{
                   background: isDark ? "#1e293b" : "#fff",
                   border: `1.5px solid ${isDark ? "#334155" : "#e2e8f0"}`,
@@ -208,7 +201,7 @@ export default function StatCard({
                       setRange(r);
                       setShowRangeMenu(false);
                     }}
-                    className={`block w-full text-left px-4 py-2 text-sm font-medium transition-colors ${
+                    className={`block w-full text-left px-3 py-1.5 text-xs font-medium transition-colors ${
                       r === 'W' ? 'rounded-t-lg' : ''
                     } ${r === 'Y' ? 'rounded-b-lg' : ''}`}
                     style={{
@@ -224,121 +217,134 @@ export default function StatCard({
           </div>
         </div>
 
-        {/* Amount */}
-        <div className="mb-4">
-          <p
-            className="font-bold overflow-hidden text-ellipsis text-2xl sm:text-3xl"
-            title={safeValue}
+        <div className="relative">
+          <div
+            className={`absolute inset-y-0 right-0 ${compact ? 'w-[120px]' : 'w-[160px]'} opacity-40 pointer-events-none z-0`}
             style={{
-              color: isDark ? "#fff" : "#1e293b",
-              fontWeight: 800,
-              letterSpacing: '-0.01em',
-              wordBreak: 'break-word'
+              WebkitMaskImage: 'linear-gradient(to left, rgba(0,0,0,1) 70%, rgba(0,0,0,0) 100%)',
+              maskImage: 'linear-gradient(to left, rgba(0,0,0,1) 70%, rgba(0,0,0,0) 100%)',
             }}
           >
-            {safeValue}
-          </p>
-        </div>
-
-        {/* Chart */}
-        {data.length > 0 && (
-          <div className="h-20 rounded-lg overflow-hidden mb-4 border" style={{
-            background: isDark ? "rgba(0,0,0,0.2)" : `${iconColors[variant] || "#2563eb"}08`,
-            borderColor: isDark ? "rgba(255,255,255,0.1)" : `${iconColors[variant] || "#2563eb"}20`,
-          }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <defs>
-                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke={iconColors[variant] || "#2563eb"}
-                  fill={`url(#${gradientId})`}
-                  strokeWidth={2}
-                  strokeOpacity={1}
-                  fillOpacity={1}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {data.length > 0 ? (
+              <div className="w-full h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={data} margin={{ top: 10, right: 0, bottom: 10, left: 0 }}>
+                    <defs>
+                      <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0.18} />
+                        <stop offset="100%" stopColor={iconColors[variant] || "#2563eb"} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke={iconColors[variant] || "#2563eb"}
+                      fill={`url(#${gradientId})`}
+                      strokeWidth={3}
+                      strokeOpacity={0.95}
+                      fillOpacity={1}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      dot={false}
+                      isAnimationActive={true}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : null}
           </div>
-        )}
 
-        {/* Bottom: Percentage Badge and Timestamp */}
-        <div className="space-y-3 mt-auto">
-          <div className="flex items-center gap-3">
-            {data.length > 1 && (
-              <div
-                className="h-12 w-12 flex flex-col items-center justify-center rounded-full shadow-md border-2"
+          <div className={`min-w-0 flex flex-col relative z-10 ${compact ? 'pr-[120px]' : 'pr-[160px]'}`}>
+            <div className={`flex items-start ${compact ? 'mb-2' : 'mb-3'}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={`${compact ? 'h-7 w-7 rounded-lg' : 'h-8 w-8 rounded-lg'} flex items-center justify-center flex-shrink-0`}
+                  style={{
+                    background: `${iconColors[variant] || "#2563eb"}15`,
+                  }}
+                >
+                  <Icon className={`${compact ? 'h-4 w-4' : 'h-5 w-5'}`} style={{ color: iconColors[variant] || "#2563eb" }} />
+                </div>
+                <p className="text-xs uppercase tracking-widest font-semibold opacity-70 truncate" style={{ color: iconColors[variant] || "#2563eb" }}>
+                  {safeTitle}
+                </p>
+              </div>
+            </div>
+
+            <div className={`${compact ? 'mb-2' : 'mb-3'}`}>
+              <p
+                className={`font-bold overflow-hidden text-ellipsis ${compact ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'}`}
+                title={safeValue}
                 style={{
-                  background: pct >= 0
-                    ? (isDark ? "rgba(5, 150, 105, 0.25)" : "rgba(5, 150, 105, 0.1)")
-                    : (isDark ? "rgba(220, 38, 38, 0.25)" : "rgba(220, 38, 38, 0.1)"),
-                  color: pct >= 0 ? "#059669" : "#dc2626",
-                  borderColor: pct >= 0 ? (isDark ? "rgba(5, 150, 105, 0.4)" : "rgba(5, 150, 105, 0.3)") : (isDark ? "rgba(220, 38, 38, 0.4)" : "rgba(220, 38, 38, 0.3)"),
+                  color: isDark ? "#fff" : "#1e293b",
+                  fontWeight: 800,
+                  letterSpacing: '-0.01em',
+                  wordBreak: 'break-word'
                 }}
               >
-                <div className="flex items-center gap-1">
-                  {pct >= 0 ? (
-                    <ArrowTrendingUpIcon className="h-4 w-4" />
-                  ) : (
-                    <ArrowTrendingDownIcon className="h-4 w-4" />
-                  )}
-                </div>
-                <div className="text-xs font-bold">
-                  {Math.abs(pct).toFixed(1)}%
-                </div>
-              </div>
-            )}
-            <div>
-              {data.length > 1 && (
-                <div className="text-xs font-semibold" style={{ color: pct >= 0 ? "#059669" : "#dc2626" }}>
-                  {pct >= 0 ? 'Increase' : 'Decrease'}
-                </div>
-              )}
-              {lastText && (
-                <div className="text-xs opacity-60" style={{ color: isDark ? "#cbd5e1" : "#64748b" }}>
-                  as of {lastText}
-                </div>
-              )}
+                {safeValue}
+              </p>
             </div>
-          </div>
 
-          {/* AI Insight */}
-          <div
-            className="rounded-lg p-3 border text-xs leading-relaxed"
-            style={{
-              background: isDark ? "rgba(255,255,255,0.05)" : `${iconColors[variant] || "#2563eb"}08`,
-              borderColor: isDark ? "rgba(255,255,255,0.1)" : `${iconColors[variant] || "#2563eb"}20`,
-              color: isDark ? "#cbd5e1" : "#64748b",
-            }}
-          >
-            {insightLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-current animate-pulse"></div>
-                <span className="opacity-70">Generating insight...</span>
-              </div>
-            ) : insight && typeof insight === 'string' ? (
-              <div className="flex flex-col gap-2">
-                <p className="m-0">{insight}</p>
-                {insightSource?.source && insightSource.source !== 'fallback' && (
-                  <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">✨ Powered by {insightSource.source === 'grok' ? 'Grok' : insightSource.source === 'openai' ? 'OpenAI' : 'AI'}</span>
+            <div className="flex items-center gap-3">
+              {data.length > 1 && (
+                <div
+                  className={`${compact ? 'h-10 w-10' : 'h-12 w-12'} flex flex-col items-center justify-center rounded-full shadow-md`}
+                  style={{
+                    background: pct >= 0
+                      ? (isDark ? "rgba(5, 150, 105, 0.25)" : "rgba(5, 150, 105, 0.1)")
+                      : (isDark ? "rgba(220, 38, 38, 0.25)" : "rgba(220, 38, 38, 0.1)"),
+                    color: pct >= 0 ? "#059669" : "#dc2626",
+                  }}
+                >
+                  <div className="flex items-center gap-1">
+                    {pct >= 0 ? (
+                      <ArrowTrendingUpIcon className={`${compact ? 'h-4 w-4' : 'h-4 w-4'}`} />
+                    ) : (
+                      <ArrowTrendingDownIcon className={`${compact ? 'h-4 w-4' : 'h-4 w-4'}`} />
+                    )}
+                  </div>
+                  <div className={`${compact ? 'text-[10px]' : 'text-xs'} font-bold`}>
+                    {Math.abs(pct).toFixed(1)}%
+                  </div>
+                </div>
+              )}
+              <div className="min-w-0">
+                {data.length > 1 && (
+                  <div className="text-xs font-semibold" style={{ color: pct >= 0 ? "#059669" : "#dc2626" }}>
+                    {pct >= 0 ? 'Increase' : 'Decrease'}
+                  </div>
+                )}
+                {lastText && (
+                  <div className="text-xs opacity-60" style={{ color: isDark ? "#cbd5e1" : "#64748b" }}>
+                    as of {lastText}
+                  </div>
                 )}
               </div>
-            ) : (
-              <span className="opacity-50 italic">
-                {variant === 'income' && 'Monitor your income trends and donor patterns.'}
-                {variant === 'expenses' && 'Track your spending and optimize budget allocation.'}
-                {variant === 'balance' && 'Keep your balance healthy by balancing income and expenses.'}
-              </span>
-            )}
+            </div>
+
+            <div
+              className={`mt-3 rounded-lg ${compact ? 'p-2.5' : 'p-3'} text-xs leading-relaxed`}
+              style={{
+                background: isDark ? "rgba(255,255,255,0.05)" : `${iconColors[variant] || "#2563eb"}08`,
+                color: isDark ? "#cbd5e1" : "#64748b",
+              }}
+            >
+              {insightLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-current animate-pulse"></div>
+                  <span className="opacity-70">Generating insight...</span>
+                </div>
+              ) : insight && typeof insight === 'string' ? (
+                <p className="m-0 line-clamp-3">{insight}</p>
+              ) : (
+                <span className="opacity-50 italic">
+                  {variant === 'income' && 'Monitor your income trends and donor patterns.'}
+                  {variant === 'expenses' && 'Track your spending and optimize budget allocation.'}
+                  {variant === 'balance' && 'Keep your balance healthy by balancing income and expenses.'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -1,19 +1,28 @@
 import { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { useOrg } from '../context/OrgContext';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import FormInput from '../components/FormInput';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import SendInvitation from '../components/SendInvitation';
+import SuccessAnimation from '../components/ui/SuccessAnimation';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { markAsRealData } from '../utils/demoDataHelper';
 import './AddFunder.css';
 
 export default function AddFunder() {
   const { addFunder, byFunder } = useFinance();
+  const { activeOrgId } = useOrg();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', contact: '', notes: '' });
   const [saving, setSaving] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [newFunderId, setNewFunderId] = useState(null);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -24,16 +33,24 @@ export default function AddFunder() {
       const funderId = await addFunder(form);
       setNewFunderId(funderId);
       
-      // Show the invitation dialog
-      setShowInviteDialog(true);
+      // Mark organization as having real data (this disables demo mode)
+      await markAsRealData(activeOrgId);
       
-      // Reset the form but don't navigate yet
+      // Show success animation and then navigate to dashboard
+      setShowSuccessAnimation(true);
+      
+      // Reset the form
       setForm({ name: '', contact: '', notes: '' });
     } catch (error) {
       console.error('Error adding funder:', error);
     } finally {
       setSaving(false);
     }
+  };
+  
+  const handleSuccessAnimationComplete = () => {
+    // Navigate to dashboard overview after animation completes
+    navigate('/app/dashboard/overview');
   };
   
   const handleInviteSuccess = () => {
@@ -190,6 +207,15 @@ export default function AddFunder() {
           <div>Loading funder information...</div>
         )}
       </Modal>
+      
+      {/* Success Animation */}
+      <SuccessAnimation
+        show={showSuccessAnimation}
+        message={successMessage}
+        type="funder"
+        duration={2500}
+        onComplete={handleSuccessAnimationComplete}
+      />
     </div>
   );
 }

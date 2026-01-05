@@ -1,101 +1,82 @@
-const API_PATH = '/api/ai/insight';
-
-// Track which insights came from OpenAI vs fallback for debugging
-export const insightSource = { source: 'fallback', timestamp: Date.now() };
-
-function generateFallbackInsight(type, change) {
-  const isIncome = /income/i.test(type);
-  const isExpenses = /expense/i.test(type);
-  const isBalance = /balance/i.test(type);
-  const clamped = Math.max(-100, Math.min(100, Number(change) || 0));
-  const changeAbs = Math.abs(Math.round(clamped));
-
-  if (isIncome) {
-    if (changeAbs < 1) return 'Income steady. Monitor for opportunities to increase.';
-    return clamped >= 0 ? `Income up ${changeAbs}%. Good momentum!` : `Income down ${changeAbs}%. Consider fundraising strategies.`;
-  } else if (isExpenses) {
-    if (changeAbs < 1) return 'Expenses stable. Maintain current controls.';
-    return clamped >= 0 ? `Expenses up ${changeAbs}%. Review major categories.` : `Expenses down ${changeAbs}%. Great cost control!`;
-  } else if (isBalance) {
-    if (changeAbs < 1) return 'Balance unchanged. Keep monitoring closely.';
-    return clamped >= 0 ? `Balance improving ${changeAbs}%. Surplus growing!` : `Balance declining ${changeAbs}%. Increase income or reduce expenses.`;
-  }
-  return 'Monitor trends and adjust your plans accordingly.';
-}
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 export async function generateInsight(dataContext) {
+  if (!GEMINI_API_KEY) {
+    console.warn('Gemini API key not configured');
+    return null;
+  }
+
   try {
-    const type = dataContext?.type || 'insight';
-    const title = type === 'income' ? 'Income' : type === 'expenses' ? 'Expenses' : type === 'balance' ? 'Balance' : String(type || 'Insight');
-    const change = Number(dataContext?.periodChangePercent ?? 0);
+    const { type, amount, currency, trend, topCategory, periodChangePercent, totalIncome, totalExpenses, topExpenseCategories } = dataContext;
 
-    const metrics = {
-      amount: dataContext?.amount ?? 0,
-      currency: dataContext?.currency ?? 'USD',
-      periodChangePercent: change,
-      topCategory: dataContext?.topCategory ?? null,
-      topExpenseCategory: dataContext?.topExpenseCategories ? dataContext.topExpenseCategories[0] : dataContext?.topExpenseCategory,
-      topIncomeSource: dataContext?.topIncomeSource,
-      totalIncome: dataContext?.totalIncome,
-      totalExpenses: dataContext?.totalExpenses,
-    };
+    let prompt = '';
 
-    // Attempt to fetch AI insight from API
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+    if (type === 'income') {
+      prompt = `You are a financial analyst. Analyze this income data and provide ONE short, insightful sentence (max 15 words) about the income trend.
 
-      const res = await fetch(API_PATH, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, metrics }),
-        signal: controller.signal
-      });
+Data:
+- Current Income: ${currency} ${amount.toLocaleString()}
+- Weekly Trend: ${periodChangePercent}% change
+- Top Income Source: ${topCategory || 'N/A'}
+- Period: This week
 
-      clearTimeout(timeoutId);
+Provide a brief, actionable insight. Example: "5% increase this week, donors are your main source."`;
+    } else if (type === 'expenses') {
+      prompt = `You are a financial analyst. Analyze this expense data and provide ONE short, insightful sentence (max 15 words) about spending patterns.
 
-      if (res.ok) {
-        const json = await res.json().catch(() => null);
-        if (json && typeof json === 'object') {
-          const summary = json?.insight?.summary || json?.summary;
-          const provider = json?.provider || (json?.error ? 'fallback' : null);
-          if (typeof summary === 'string' && summary.trim()) {
-            insightSource.source = provider || 'huggingface';
-            insightSource.timestamp = Date.now();
-            insightSource.title = title;
-            insightSource.change = change;
-            if (insightSource.source === 'huggingface') {
-              console.log('🤗 Hugging Face Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
-            } else if (insightSource.source === 'grok') {
-              console.log('✅ Grok Insight Generated:', { title, change, summary: summary.substring(0, 60) + '...' });
-            } else {
-              console.log('📊 Fallback Insight Used:', { title, change, insight: summary.substring(0, 60) + '...' });
-            }
-            return summary.trim();
-          }
-        }
-        console.debug('⚠️ AI insight API returned empty response - using fallback');
-      } else {
-        console.debug(`⚠️ AI insight API error (${res.status}) - using fallback`);
-      }
-    } catch (fetchError) {
-      if (fetchError?.name === 'AbortError') {
-        console.debug('⚠️ AI insight request timed out - using fallback');
-      } else if (fetchError?.message?.includes('Failed to fetch')) {
-        console.debug('⚠️ AI insight API unreachable - using fallback');
-      } else {
-        console.debug('⚠️ AI insight generation failed - using fallback:', fetchError?.message);
-      }
+Data:
+- Current Expenses: ${currency} ${amount.toLocaleString()}
+- Weekly Trend: ${periodChangePercent}% change
+- Top Expense Category: ${topCategory || 'N/A'}
+- All Categories: ${topExpenseCategories.join(', ') || 'N/A'}
+- Period: This week
+
+Provide a brief, actionable insight about their biggest expense drain. Example: "Transport costs increased 12% this week, your biggest drain."`;
+    } else if (type === 'balance') {
+      prompt = `You are a financial analyst. Analyze this balance data and provide ONE short, insightful sentence (max 15 words) about their financial health.
+
+Data:
+- Current Balance: ${currency} ${amount.toLocaleString()}
+- Total Income: ${currency} ${totalIncome.toLocaleString()}
+- Total Expenses: ${currency} ${totalExpenses.toLocaleString()}
+- Weekly Trend: ${periodChangePercent}% change
+- Period: This week
+
+Provide a brief, actionable insight about their financial health. Example: "Balance growing steadily, income outpaces expenses by 30%."`;
     }
 
-    // Return a fallback insight if API fails
-    insightSource.source = 'fallback';
-    insightSource.timestamp = Date.now();
-    insightSource.title = title;
-    insightSource.change = change;
-    const fallback = generateFallbackInsight(title, change);
-    console.log('📊 Fallback Insight Used:', { title, change, insight: fallback });
-    return fallback;
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 50,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Gemini API error:', response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    const insight = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    return insight || null;
   } catch (error) {
     console.error('Error generating insight:', error);
     return null;
@@ -104,15 +85,15 @@ export async function generateInsight(dataContext) {
 
 export function getCachedInsight(key) {
   try {
-    const cached = sessionStorage.getItem(`insight_${key}`);
+    const cached = localStorage.getItem(`insight_${key}`);
     if (!cached) return null;
 
     const { insight, timestamp } = JSON.parse(cached);
     const now = Date.now();
-    const expiryTime = 5 * 60 * 1000;
+    const expiryTime = 24 * 60 * 60 * 1000; // 24 hours
 
     if (now - timestamp > expiryTime) {
-      sessionStorage.removeItem(`insight_${key}`);
+      localStorage.removeItem(`insight_${key}`);
       return null;
     }
 
@@ -125,7 +106,7 @@ export function getCachedInsight(key) {
 
 export function setCachedInsight(key, insight) {
   try {
-    sessionStorage.setItem(`insight_${key}`, JSON.stringify({
+    localStorage.setItem(`insight_${key}`, JSON.stringify({
       insight,
       timestamp: Date.now(),
     }));

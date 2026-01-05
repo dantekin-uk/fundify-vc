@@ -1,42 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useOrg } from '../context/OrgContext';
 import { useTheme } from '../context/ThemeContext';
+import { toast } from 'react-toastify';
 import FormInput from '../components/FormInput';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 
 export default function Settings() {
   const { user, updateUser } = useAuth();
-  const { orgs, activeOrg, switchOrg } = useOrg();
+  const { orgs, activeOrg, switchOrg, setOrgCurrency } = useOrg();
   const { isDark, toggleTheme } = useTheme();
 
   const [profile, setProfile] = useState({ name: user?.name || '', email: user?.email || '' });
-  const [orgSettings, setOrgSettings] = useState({ currency: user?.orgSettings?.currency || 'USD' });
-  const [saving, setSaving] = useState(false);
+  const [orgSettings, setOrgSettings] = useState({ currency: activeOrg?.currency || 'USD' });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingOrg, setSavingOrg] = useState(false);
+
+  useEffect(() => {
+    if (activeOrg) {
+      setOrgSettings({ currency: activeOrg.currency || 'USD' });
+    }
+  }, [activeOrg]);
 
   const saveProfile = async () => {
-    setSaving(true);
+    setSavingProfile(true);
     try {
       await updateUser({ name: profile.name });
-      alert('Profile saved');
+      toast.success('Profile saved');
     } catch (e) {
       console.error(e);
-      alert('Failed to save profile');
+      toast.error('Failed to save profile');
     } finally {
-      setSaving(false);
+      setSavingProfile(false);
     }
   };
 
   const saveOrg = async () => {
-    setSaving(true);
+    setSavingOrg(true);
     try {
-      await updateUser({ orgSettings });
-      alert('Organization settings updated');
+      const ok = await setOrgCurrency(orgSettings.currency);
+      if (!ok || ok.error) throw new Error((ok && ok.error) || 'Failed to update org');
+      toast.success('Organization settings updated');
     } catch (e) {
       console.error(e);
-      alert('Failed to save organization settings');
+      toast.error('Failed to save organization settings');
     } finally {
-      setSaving(false);
+      setSavingOrg(false);
     }
   };
 
@@ -58,7 +67,7 @@ export default function Settings() {
             <FormInput label="Name" id="settings-name" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
             <FormInput label="Email" id="settings-email" value={profile.email} disabled />
             <div className="flex items-center justify-end">
-              <button onClick={saveProfile} disabled={saving} className="px-4 py-2 rounded-md bg-sky-700 text-white">{saving ? 'Saving...' : 'Save'}</button>
+              <button onClick={saveProfile} disabled={savingProfile} className="px-4 py-2 rounded-md bg-sky-700 text-white">{savingProfile ? 'Saving...' : 'Save'}</button>
             </div>
           </CardContent>
         </Card>
@@ -85,7 +94,7 @@ export default function Settings() {
               </select>
             </div>
             <div className="mt-4 flex items-center justify-end">
-              <button onClick={saveOrg} disabled={saving} className="px-4 py-2 rounded-md bg-sky-700 text-white">{saving ? 'Saving...' : 'Save'}</button>
+              <button onClick={saveOrg} disabled={savingOrg} className="px-4 py-2 rounded-md bg-sky-700 text-white">{savingOrg ? 'Saving...' : 'Save'}</button>
             </div>
           </CardContent>
         </Card>

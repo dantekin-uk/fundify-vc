@@ -4,9 +4,9 @@ import { useFinance } from '../context/FinanceContext';
 import { useOrg } from '../context/OrgContext';
 
 const COLORS_EXP = [
-  '#4F46E5', '#3B82F6', '#10B981', '#F59E0B', '#EF4444',  // Primary colors
-  '#8B5CF6', '#06B6D4', '#F97316', '#84CC16', '#14B8A6',  // Secondary colors
-  '#6366F1', '#EC4899', '#F43F5E', '#0EA5E9', '#22C55E'   // Additional colors
+  '#4F46E5', '#0EA5E9', '#06B6D4', '#14B8A6', '#10B981',
+  '#22C55E', '#84CC16', '#F59E0B', '#F97316', '#F43F5E',
+  '#EC4899', '#8B5CF6', '#6366F1', '#3B82F6', '#A855F7'
 ];
 
 function formatCurrency(v, currency = 'USD') {
@@ -117,9 +117,9 @@ export const ExpensePieChart = ({ data: propData, compact = false }) => {
   if (compact) {
     // Compact, modern thin donut for right-side placement
     return (
-      <div className="overflow-hidden rounded-2xl bg-white/90 backdrop-blur ring-1 ring-gray-200 shadow-sm p-4 max-w-[16rem] sm:max-w-[18rem] dark:bg-slate-900/70 dark:ring-slate-800 dark:text-slate-100">
+      <div className="overflow-hidden rounded-2xl bg-white/90 backdrop-blur ring-1 ring-gray-200 shadow-sm p-4 w-full min-w-0 dark:bg-slate-900/70 dark:ring-slate-800 dark:text-slate-100 flex flex-col">
         <h3 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Expenses Breakdown</h3>
-        <div className="h-48 relative">
+        <div className="h-64 sm:h-72 relative">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <defs>
@@ -135,16 +135,17 @@ export const ExpensePieChart = ({ data: propData, compact = false }) => {
                 dataKey="value"
                 cx="50%"
                 cy="50%"
-                innerRadius="70%"  // Thinner ring (higher percentage)
-                outerRadius="90%"  // Slightly smaller overall
-                paddingAngle={1}   // Tighter spacing between segments
+                innerRadius="78%"  // Thinner ring (higher percentage)
+                outerRadius="94%"  // Slightly smaller overall
+                paddingAngle={2}   // Tighter spacing between segments
                 startAngle={90}
                 endAngle={-270}
                 isAnimationActive={true}
                 animationDuration={1200}
                 animationEasing="ease-out"
                 labelLine={false}
-                label={renderOutsideLabel}
+                label={false}
+                cornerRadius={10}
               >
                 {data.map((entry, idx) => (
                   <Cell 
@@ -175,7 +176,7 @@ export const ExpensePieChart = ({ data: propData, compact = false }) => {
           <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(total, currency)}</span>
         </div>
         {/* Condensed breakdown list */}
-        <div className="mt-2 space-y-1.5 max-h-32 overflow-auto pr-1">
+        <div className="mt-2 space-y-1.5 max-h-32 overflow-auto pr-2 scrollbar-hide">
           {data.map((d, i) => (
             <div key={d.name} className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">

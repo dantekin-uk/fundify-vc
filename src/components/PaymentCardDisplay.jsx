@@ -51,11 +51,11 @@ export default function PaymentCardDisplay({ payment, onDelete, onSetDefault, si
         <div className="relative z-10 flex flex-col h-full justify-between">
           {/* Top section - Icon and Badge */}
           <div className="flex items-start justify-between">
-            <div className="p-3 rounded-xl bg-white/20 backdrop-blur-md">
+            <div className="p-3 rounded-xl bg-white/20 dark:bg-black/20 backdrop-blur-md">
               <CreditCardIcon className="h-6 w-6 text-white" />
             </div>
             {payment.isDefault && (
-              <span className="text-xs font-bold bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/40">
+              <span className="text-xs font-bold bg-white/30 dark:bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/40 dark:border-white/10">
                 DEFAULT
               </span>
             )}
@@ -82,18 +82,18 @@ export default function PaymentCardDisplay({ payment, onDelete, onSetDefault, si
 
         {/* Action buttons on hover */}
         {size !== 'small' && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl flex items-center justify-center gap-3 z-20">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/30 dark:from-black/60 dark:to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl flex items-center justify-center gap-3 z-20">
             {!payment.isDefault && (
               <button
                 onClick={() => onSetDefault?.(payment.id)}
-                className="px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all duration-200 transform hover:scale-110 shadow-lg"
+                  className="px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all duration-200 transform hover:scale-110 shadow-lg dark:bg-slate-800 dark:text-indigo-200 dark:hover:bg-slate-700"
               >
                 Set Default
               </button>
             )}
             <button
               onClick={() => onDelete?.(payment.id)}
-              className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-all duration-200 transform hover:scale-110 shadow-lg"
+                className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-all duration-200 transform hover:scale-110 shadow-lg dark:bg-red-600 dark:hover:bg-red-700"
             >
               Delete
             </button>
@@ -117,11 +117,11 @@ export default function PaymentCardDisplay({ payment, onDelete, onSetDefault, si
         <div className="relative z-10 flex flex-col h-full justify-between">
           {/* Top section - Icon and Badge */}
           <div className="flex items-start justify-between">
-            <div className="p-3 rounded-xl bg-white/20 backdrop-blur-md">
+            <div className="p-3 rounded-xl bg-white/20 dark:bg-black/20 backdrop-blur-md">
               <BanknotesIcon className="h-6 w-6 text-white" />
             </div>
             {payment.isDefault && (
-              <span className="text-xs font-bold bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/40">
+              <span className="text-xs font-bold bg-white/30 dark:bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/40 dark:border-white/10">
                 DEFAULT
               </span>
             )}
@@ -143,18 +143,18 @@ export default function PaymentCardDisplay({ payment, onDelete, onSetDefault, si
 
         {/* Action buttons on hover */}
         {size !== 'small' && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl flex items-center justify-center gap-3 z-20">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/30 dark:from-black/60 dark:to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl flex items-center justify-center gap-3 z-20">
             {!payment.isDefault && (
               <button
                 onClick={() => onSetDefault?.(payment.id)}
-                className="px-4 py-2 bg-white text-green-600 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all duration-200 transform hover:scale-110 shadow-lg"
+                  className="px-4 py-2 bg-white text-green-600 rounded-xl font-bold text-sm hover:bg-gray-100 transition-all duration-200 transform hover:scale-110 shadow-lg dark:bg-slate-800 dark:text-emerald-200 dark:hover:bg-slate-700"
               >
                 Set Default
               </button>
             )}
             <button
               onClick={() => onDelete?.(payment.id)}
-              className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-all duration-200 transform hover:scale-110 shadow-lg"
+                className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-all duration-200 transform hover:scale-110 shadow-lg dark:bg-red-600 dark:hover:bg-red-700"
             >
               Delete
             </button>

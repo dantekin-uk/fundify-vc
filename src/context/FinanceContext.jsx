@@ -1113,7 +1113,9 @@ export function FinanceProvider({ children }) {
       newFunder,
     ];
     setState((s) => ({ ...s, funders: updatedFunders }));
-    await syncToFirestore('funders', updatedFunders);
+    syncToFirestore('funders', updatedFunders).catch((e) => {
+      console.error('Failed to sync funders to Firestore', e);
+    });
     return newFunder.id;
   };
 

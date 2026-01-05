@@ -79,17 +79,17 @@ const RecentTransactions = ({ limit = 8 }) => {
   };
 
   return (
-    <div className="rounded-xl bg-white dark:bg-slate-800 p-4 ring-1 ring-gray-200 dark:ring-slate-700">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Recent Transactions</h3>
+    <div className="rounded-2xl bg-white/90 backdrop-blur-sm ring-1 ring-gray-200/50 shadow-sm dark:bg-slate-900/80 dark:ring-slate-700/50 p-5 h-full flex flex-col">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-slate-100">Recent Transactions</h3>
       </div>
 
       {transactions.length === 0 ? (
-        <div className="text-center py-8">
+        <div className="flex items-center justify-center flex-1 py-8">
           <p className="text-sm text-gray-500 dark:text-slate-400">No transactions yet</p>
         </div>
       ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
+        <div className="space-y-2 overflow-y-auto flex-1 scrollbar-hide">
           {transactions.map((tx) => (
             <div
               key={`${tx.type}-${tx.id}`}
@@ -117,7 +117,7 @@ const RecentTransactions = ({ limit = 8 }) => {
               <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                 <div className="text-right">
                   <div className={`text-sm font-semibold ${tx.type === 'income' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                    {tx.type === 'income' ? '+' : '-'}{formatAmount(tx.amount, tx.currency || currency)}
+                    {tx.type === 'income' ? '+' : '-'}{formatAmount(tx.amount, currency)}
                   </div>
                   <div className="text-xs text-gray-600 dark:text-slate-400">
                     {formatDate(tx.date)}

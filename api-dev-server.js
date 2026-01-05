@@ -29,13 +29,12 @@ app.post('/api/ai/insight', async (req, res) => {
       return;
     }
 
-    const key = process.env.HF_API_KEY;
-    const model = process.env.HF_MODEL || 'microsoft/Phi-3.5-mini-instruct';
+    const key = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+    const model = process.env.GROK_MODEL || 'grok-2-mini';
 
     const baseSummary = `${title}: ${Number(metrics?.amount || metrics?.value || 0).toLocaleString()} ${metrics?.currency || ''}`.trim();
     const change = Number(metrics?.periodChangePercent ?? metrics?.trend ?? 0);
-    const clamped = Math.max(-100, Math.min(100, change));
-    const urgency = Math.abs(clamped) >= 15 ? 'high' : Math.abs(clamped) >= 7 ? 'medium' : 'low';
+    const urgency = Math.abs(change) >= 15 ? 'high' : Math.abs(change) >= 7 ? 'medium' : 'low';
     
     const fallback = () => {
       const isIncome = /income/i.test(title);
@@ -45,28 +44,28 @@ app.post('/api/ai/insight', async (req, res) => {
       let recommendation = 'Monitor trends and adjust plan.';
       
       if (isIncome) {
-        summary = clamped >= 0 ? `Income up ${Math.round(Math.abs(clamped))}%` : `Income down ${Math.round(Math.abs(clamped))}%`;
-        recommendation = clamped >= 0 ? 'Engage donors and maintain momentum.' : 'Strengthen outreach to improve inflows.';
+        summary = change >= 0 ? `Income up ${Math.round(change)}%` : `Income down ${Math.abs(Math.round(change))}%`;
+        recommendation = change >= 0 ? 'Engage donors and maintain momentum.' : 'Strengthen outreach to improve inflows.';
       } else if (isExpenses) {
-        summary = clamped >= 0 ? `Expenses up ${Math.round(Math.abs(clamped))}%` : `Expenses down ${Math.round(Math.abs(clamped))}%`;
-        recommendation = clamped >= 0 ? 'Prioritize cost control on top categories.' : 'Maintain current spending discipline.';
+        summary = change >= 0 ? `Expenses up ${Math.round(change)}%` : `Expenses down ${Math.abs(Math.round(change))}%`;
+        recommendation = change >= 0 ? 'Prioritize cost control on top categories.' : 'Maintain current spending discipline.';
       } else if (isBalance) {
-        summary = clamped >= 0 ? `Balance improving ${Math.round(Math.abs(clamped))}%` : `Balance declining ${Math.round(Math.abs(clamped))}%`;
-        recommendation = clamped >= 0 ? 'Allocate surplus to key projects.' : 'Reduce expenses to stabilize balance.';
+        summary = change >= 0 ? `Balance improving ${Math.round(change)}%` : `Balance declining ${Math.abs(Math.round(change))}%`;
+        recommendation = change >= 0 ? 'Allocate surplus to key projects.' : 'Reduce expenses to stabilize balance.';
       }
       
       return { summary, recommendation, urgency };
     };
 
     if (!key) {
-      res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'missing_hf_key' });
+      res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'missing_grok_key' });
       return;
     }
 
     const prompt = [
       `Title: ${title}`,
       `Amount: ${metrics?.amount ?? metrics?.value ?? 0} ${metrics?.currency || ''}`,
-      `ChangePercent: ${clamped}`,
+      `ChangePercent: ${change}`,
       `TopCategory: ${metrics?.topCategory || metrics?.topExpenseCategory || metrics?.topIncomeSource || 'N/A'}`,
       `TotalIncome: ${metrics?.totalIncome ?? 'N/A'}`,
       `TotalExpenses: ${metrics?.totalExpenses ?? 'N/A'}`,
@@ -74,55 +73,55 @@ app.post('/api/ai/insight', async (req, res) => {
     ].join('\n');
 
     try {
-      console.log(`[HF] Requesting insight for: ${title}, Model: ${model}`);
+      console.log(`[Grok] Requesting insight for: ${title}, Model: ${model}`);
 
-      const hfResponse = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+      const openaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${key}`
         },
         body: JSON.stringify({
-          inputs: [
-            'Generate concise financial insights as JSON only. Keys: summary, recommendation, urgency (low|medium|high). No prose.',
-            prompt
-          ].join('\n'),
-          parameters: { temperature: 0.3, max_new_tokens: 160, top_p: 0.9, return_full_text: false, wait_for_model: true }
+          model,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: 'Generate concise financial insights as JSON only.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 160
         })
       });
 
-      if (!hfResponse.ok) {
-        const errorText = await hfResponse.text();
-        console.error(`[HF] API Error (${hfResponse.status}):`, errorText);
-        res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'hf_error', details: errorText });
+      if (!openaiResponse.ok) {
+        const errorText = await openaiResponse.text();
+        console.error(`[Grok] API Error (${openaiResponse.status}):`, errorText);
+        res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'grok_error', details: errorText });
         return;
       }
 
-      const data = await hfResponse.json();
-      const content = (Array.isArray(data) ? (data[0]?.generated_text || '') : (data?.generated_text || (typeof data === 'string' ? data : '')));
-      console.log(`[HF] Response received, content length: ${content.length}`);
+      const data = await openaiResponse.json();
+      const content = data?.choices?.[0]?.message?.content || '';
+      console.log(`[Grok] Response received, content length: ${content.length}`);
 
       let parsed = null;
       try {
-        const start = content.indexOf('{');
-        const end = content.lastIndexOf('}');
-        const jsonText = start >= 0 && end >= start ? content.slice(start, end + 1) : content;
-        parsed = JSON.parse(jsonText);
+        parsed = JSON.parse(content);
       } catch (parseErr) {
-        console.error('[HF] JSON Parse Error:', parseErr.message, 'Content:', content);
+        console.error('[Grok] JSON Parse Error:', parseErr.message, 'Content:', content);
         parsed = null;
       }
 
       if (!parsed || !parsed.summary || !parsed.recommendation || !parsed.urgency) {
-        console.warn('[HF] Invalid response structure:', parsed);
+        console.warn('[Grok] Invalid response structure:', parsed);
         res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'bad_json' });
         return;
       }
 
-      console.log('[HF] Successfully generated insight');
-      res.status(200).json({ success: true, provider: 'huggingface', insight: parsed });
+      console.log('[Grok] Successfully generated insight');
+      res.status(200).json({ success: true, provider: 'grok', insight: parsed });
     } catch (e) {
-      console.error('[HF] Exception:', e.message);
+      console.error('[Grok] Exception:', e.message);
       res.status(200).json({ success: true, provider: 'fallback', insight: fallback(), error: 'exception', details: e.message });
     }
   } catch (err) {
@@ -134,8 +133,8 @@ app.post('/api/ai/insight', async (req, res) => {
 const PORT = process.env.API_PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Development API server running on http://localhost:${PORT}`);
-  console.log(`HF Key configured: ${process.env.HF_API_KEY ? 'YES' : 'NO'}`);
-  console.log(`HF Model: ${process.env.HF_MODEL || 'microsoft/Phi-3.5-mini-instruct'}`);
+  console.log(`Grok Key configured: ${process.env.GROK_API_KEY ? 'YES' : 'NO'}`);
+  console.log(`Grok Model: ${process.env.GROK_MODEL || 'grok-2-mini'}`);
 });
 
 process.on('uncaughtException', (err) => {

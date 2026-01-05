@@ -1,13 +1,13 @@
 // Client-side Cloudinary upload helper (unsigned uploads using an upload preset)
 // Requires the following env vars set in .env.local or the hosting environment:
-// REACT_APP_CLOUDINARY_CLOUD_NAME and REACT_APP_CLOUDINARY_UPLOAD_PRESET
+// VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET
 
 export async function uploadFileToCloudinary(file) {
   if (!file) throw new Error('No file provided');
-  const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   if (!cloudName || !uploadPreset) {
-    throw new Error('Cloudinary not configured. Set REACT_APP_CLOUDINARY_CLOUD_NAME and REACT_APP_CLOUDINARY_UPLOAD_PRESET');
+    throw new Error('Cloudinary not configured. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET');
   }
 
   const url = `https://api.cloudinary.com/v1_1/${cloudName}/upload`;

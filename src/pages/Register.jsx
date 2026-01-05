@@ -26,6 +26,8 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const { register, login } = useAuth();
   const { switchOrg } = useOrg();
   const navigate = useNavigate();
@@ -56,8 +58,26 @@ const Register = () => {
       return;
     }
     
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    // Enhanced password validation for fintech security
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters long');
+      return;
+    }
+    
+    // Check password complexity
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      setError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+      return;
+    }
+    
+    // Legal compliance checkboxes
+    if (!acceptedTerms || !acceptedPrivacy) {
+      setError('Please accept the Terms of Service and Privacy Policy to continue');
       return;
     }
 
@@ -70,6 +90,12 @@ const Register = () => {
       }, (new URLSearchParams(location.search)).get('orgId') ? { profile: { hasCompletedSetup: true, isUserProfile: true }, createProfile: true } : {});
 
       if (success) {
+        // Show email verification notice
+        if (registerError === undefined) {
+          // Email verification was sent - show notice but don't block
+          // User can still proceed but should verify email
+        }
+        
         // Try to auto-login the newly created user so invite acceptance can proceed without extra steps
         try {
           await login(email, password);
@@ -114,21 +140,42 @@ const Register = () => {
                 console.log('Register: Next memberships:', nextMemberships);
                 console.log('Register: Next members:', nextMembers);
 
-                // Build funder object for this user so they have a portal
-                const funderObj = {
-                  id: registeredUserId,
-                  name: inv?.name || (createdUser.email || '').split('@')[0] || 'Funder',
-                  email: createdUser.email || inv?.email || '',
-                  status: 'active',
-                  createdAt: new Date().toISOString(),
-                };
-
+                // Only create funder object if the invite role is specifically for a funder/viewer
+                // Don't create funder objects for admin/financial_officer invites - they're org members, not funders
+                const isFunderInvite = roleNormalized === 'viewer' || inv.role === 'funder' || (!inv.role && roleNormalized === 'viewer');
                 const existingFunders = Array.isArray(data.funders) ? data.funders : [];
-                const nextFunders = [
-                  // keep other funders but replace any existing with same id
-                  ...existingFunders.filter((f) => f && f.id !== funderObj.id),
-                  funderObj,
-                ];
+                let nextFunders = existingFunders;
+                
+                if (isFunderInvite) {
+                  // Build funder object for this user so they have a portal
+                  // Include 'contact' field for matching in DonorDashboard
+                  const funderEmail = createdUser.email || inv?.email || '';
+                  const funderObj = {
+                    id: registeredUserId,
+                    name: inv?.name || funderEmail.split('@')[0] || 'Funder',
+                    email: funderEmail,
+                    contact: funderEmail, // Critical: used by DonorDashboard to identify funder
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                  };
+
+                  nextFunders = [
+                    // keep other funders but replace any existing with same id OR same email to prevent duplicates
+                    ...existingFunders.filter((f) => {
+                      if (!f) return false;
+                      // Remove if same ID
+                      if (f.id === funderObj.id) return false;
+                      // Remove if same email (to prevent duplicates)
+                      if (f.email && funderObj.email && f.email.toLowerCase() === funderObj.email.toLowerCase()) return false;
+                      if (f.contact && funderObj.contact && f.contact.toLowerCase() === funderObj.contact.toLowerCase()) return false;
+                      return true;
+                    }),
+                    funderObj,
+                  ];
+                } else {
+                  // For admin/financial_officer invites, make sure they're NOT in funders array
+                  nextFunders = existingFunders.filter((f) => f && f.id !== registeredUserId);
+                }
 
                 // include funders in the org update so membership and funder creation are atomic-ish
                 await updateDoc(ref, {
@@ -144,12 +191,18 @@ const Register = () => {
                 switchOrg(orgId);
                 console.log('Register: Switched to organization:', orgId);
 
-                // After successful invite acceptance during registration, redirect the user to donor dashboard or to any redirect specified in the URL
-                // Use replace: true to prevent intermediate redirects through admin dashboard
+                // After successful invite acceptance during registration, redirect based on role
+                // Use replace: true to prevent intermediate redirects
                 if (redirectTo) {
                   navigate(redirectTo, { replace: true });
                 } else {
-                  navigate(`/donor/dashboard/${registeredUserId}`, { replace: true });
+                  // Redirect based on role: funders go to donor dashboard, admins/financial officers go to org dashboard
+                  if (isFunderInvite) {
+                    navigate(`/donor/dashboard/${registeredUserId}`, { replace: true });
+                  } else {
+                    // Admin or financial officer should go to organization dashboard
+                    navigate('/app/dashboard/overview', { replace: true });
+                  }
                 }
                 return;
               }
@@ -157,29 +210,42 @@ const Register = () => {
           }
         } catch (e) {
           console.error('Accept invite after signup failed', e);
-          // Permission-safe fallback: still switch to invited org and take user to donor dashboard
+          // Permission-safe fallback: switch to invited org and take user to setup or org dashboard
           // Use replace: true to prevent intermediate redirects
           try {
             const orgId = new URLSearchParams(location.search).get('orgId');
-            if (orgId) switchOrg(orgId);
-            const fallbackId = (createdUser && createdUser.id) ? createdUser.id : 'me';
-            navigate(`/donor/dashboard/${fallbackId}`, { replace: true });
+            if (orgId) {
+              switchOrg(orgId);
+              // Go to setup first, then org dashboard - NOT donor dashboard
+              navigate('/setup', { replace: true });
+            } else {
+              // No orgId means new org creator - go to setup
+              navigate('/setup', { replace: true });
+            }
             return;
           } catch (_) {}
         }
 
-        // No invite flow or invite handling failed — send new users to setup or the provided redirect
+        // No invite flow or invite handling failed — send new organization creators to setup
+        // New users creating their own organization should NOT go to donor dashboard
+        // They should go to setup first, then organization dashboard
         if (redirectTo) {
           navigate(redirectTo);
         } else {
+          // Check if this is an invited user (has orgId in URL but no token means partial invite)
           const paramsFinal = new URLSearchParams(location.search);
           const finalOrgId = paramsFinal.get('orgId');
-          if (finalOrgId) {
-            // If an orgId is present but invite handling did not redirect, still switch and show donor dashboard
+          
+          if (finalOrgId && tokenParam) {
+            // This was an invite flow that failed - still try to switch org
             try { switchOrg(finalOrgId); } catch {}
-            navigate(`/donor/dashboard/${(createdUser && createdUser.id) ? createdUser.id : 'me'}`, { replace: true });
+            // But redirect to setup or org dashboard, not donor dashboard
+            navigate('/setup', { replace: true });
           } else {
-            navigate(`/donor/dashboard/${(createdUser && createdUser.id) ? createdUser.id : 'me'}`, { replace: true });
+            // This is a NEW organization creator (no invite)
+            // They should go to setup, NOT donor dashboard
+            // The org was created with their UID, so they're the owner/admin
+            navigate('/setup', { replace: true });
           }
         }
       } else {
@@ -229,6 +295,22 @@ const Register = () => {
                 </div>
               </div>
             )}
+            
+            {/* Email verification notice */}
+            <div className="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 dark:bg-blue-900/20 dark:border-blue-700">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Email Verification:</strong> After registration, please check your email and verify your account to access all features.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <form className="space-y-6" onSubmit={handleSubmit}>
               {/* If arriving from an invite, ask for user full name instead of organization name */}
@@ -239,8 +321,48 @@ const Register = () => {
               )}
 
               <FormInput id="email" name="email" type="email" autoComplete="email" required label="Email address" value={formData.email} onChange={handleChange} disabled={!!invitedEmail} />
-              <FormInput id="password" name="password" type="password" required label="Password" value={formData.password} onChange={handleChange} minLength="8" />
-              <FormInput id="confirmPassword" name="confirmPassword" type="password" required label="Confirm Password" value={formData.confirmPassword} onChange={handleChange} minLength="8" />
+              <FormInput id="password" name="password" type="password" required label="Password" value={formData.password} onChange={handleChange} minLength="12" />
+              {formData.password && (
+                <div className="text-xs text-gray-600 dark:text-slate-400 mt-1">
+                  <div className="flex items-center gap-2">
+                    <span className={formData.password.length >= 12 ? 'text-green-600' : 'text-gray-400'}>✓ 12+ characters</span>
+                    <span className={/[A-Z]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>✓ Uppercase</span>
+                    <span className={/[a-z]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>✓ Lowercase</span>
+                    <span className={/[0-9]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>✓ Number</span>
+                    <span className={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>✓ Special</span>
+                  </div>
+                </div>
+              )}
+              <FormInput id="confirmPassword" name="confirmPassword" type="password" required label="Confirm Password" value={formData.confirmPassword} onChange={handleChange} minLength="12" />
+              
+              {/* Legal compliance checkboxes */}
+              <div className="space-y-2">
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-1"
+                    required
+                  />
+                  <span className="text-gray-700 dark:text-slate-300">
+                    I accept the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Terms of Service</a>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={acceptedPrivacy}
+                    onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                    className="mt-1"
+                    required
+                  />
+                  <span className="text-gray-700 dark:text-slate-300">
+                    I accept the <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Privacy Policy</a>
+                  </span>
+                </label>
+              </div>
+              
               <div>
                 <Button type="submit" disabled={isLoading} className="w-full justify-center" variant="primary">
                   {isLoading ? 'Creating account...' : 'Create Account'}
