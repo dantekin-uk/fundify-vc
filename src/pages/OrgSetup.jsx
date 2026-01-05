@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { generateDemoData } from '../utils/demoData';
 import Button from '../components/ui/Button';
 import { Building2, FileText, DollarSign, Calendar, TrendingUp } from 'lucide-react';
 
@@ -108,7 +111,31 @@ export default function OrgSetup() {
         updatedAt: new Date().toISOString(),
       });
 
-      // Navigate to dashboard with demo mode initialized
+      if (user?.id) {
+        const demoData = generateDemoData(formData.currency);
+        const orgRef = doc(db, 'orgs', user.id);
+        await setDoc(orgRef, {
+          name: formData.legalName.trim(),
+          owner: user.id,
+          createdAt: new Date().toISOString(),
+          memberships: [{ userId: user.id, email: user.email, role: 'admin', addedAt: new Date().toISOString() }],
+          members: [user.id],
+          orgSettings: {
+            currency: formData.currency,
+            fiscalYearEnd: formData.fiscalYearEnd,
+            fiscalYearStartMonth: fiscalYearStartMonth,
+            fundingModel: formData.fundingModel,
+            approvalsEnabled: true,
+          },
+          funders: demoData.funders,
+          projects: demoData.projects,
+          incomes: demoData.incomes,
+          expenses: demoData.expenses,
+          isDemoMode: true,
+          demoInitializedAt: new Date().toISOString(),
+        }, { merge: true });
+      }
+
       navigate('/app/dashboard/overview');
     } catch (e) {
       console.error('Setup save error:', e);

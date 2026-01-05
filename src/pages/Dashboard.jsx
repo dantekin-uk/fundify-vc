@@ -49,8 +49,6 @@ const Dashboard = () => {
     projects = [],
   } = useFinance() || {};
 
-  // Check if organization is empty or in demo mode
-  // Only show demo for NEW USERS during first-time onboarding, not on subsequent logins
   useEffect(() => {
     if (!activeOrgId) {
       setShowDemoBanner(false);
@@ -65,43 +63,12 @@ const Dashboard = () => {
       const currentOrg = orgs?.find(o => o.id === activeOrgId);
 
       if (demo) {
-        // Use the helper function to determine if demo banner should show
         const shouldShow = shouldShowDemoBanner(currentOrg, user);
         setShowDemoBanner(shouldShow);
         return;
       }
 
-      // Only auto-initialize demo data for NEW organizations (first-time setup)
-      const isTrulyNewOrg = currentOrg && (!currentOrg.demoInitializedAt && !currentOrg.hasRealData);
-      if (empty && !initializingDemo && isTrulyNewOrg) {
-        const initializeDemo = async () => {
-          setInitializingDemo(true);
-          try {
-            const demoData = generateDemoData(currency || 'KES');
-
-            // Add demo data to Firestore
-            const orgRef = doc(db, 'orgs', activeOrgId);
-            await updateDoc(orgRef, {
-              funders: demoData.funders,
-              projects: demoData.projects,
-              incomes: demoData.incomes,
-              expenses: demoData.expenses,
-              isDemoMode: true,
-              demoInitializedAt: new Date().toISOString(),
-            });
-
-            setShowDemoBanner(true);
-          } catch (error) {
-            console.error('Failed to initialize demo data:', error);
-          } finally {
-            setInitializingDemo(false);
-          }
-        };
-
-        initializeDemo();
-      } else {
-        setShowDemoBanner(false);
-      }
+      setShowDemoBanner(false);
     } catch (error) {
       console.error('Error checking demo mode:', error);
       setShowDemoBanner(false);
@@ -130,21 +97,7 @@ const Dashboard = () => {
     }
   };
 
-  // Mark organization as having real data (call this when real items are added)
-  const markAsRealData = async () => {
-    if (!activeOrgId) return;
-    
-    try {
-      const orgRef = doc(db, 'orgs', activeOrgId);
-      await updateDoc(orgRef, {
-        hasRealData: true,
-        isDemoMode: false,
-        demoInitializedAt: null,
-      });
-    } catch (error) {
-      console.error('Failed to mark as real data:', error);
-    }
-  };
+  // Mark-as-real-data is handled via demoDataHelper and in create flows
 
   // Compute insight data
   const expenseMap = expenses
@@ -424,11 +377,7 @@ const Dashboard = () => {
               {FundsChart ? <FundsChart /> : <div className="p-4">FundsChart missing</div>}
             </div>
             <div className="md:col-span-1 min-w-0">
-              <div className="overflow-hidden rounded-2xl bg-white/90 backdrop-blur-sm ring-1 ring-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 dark:bg-slate-900/80 dark:ring-slate-700/50">
-                <div className="p-3 sm:p-4 h-64 sm:h-80 lg:h-96 flex items-stretch justify-center">
-                  {PieCharts ? <PieCharts compact /> : <div className="p-2">ExpensePieChart missing</div>}
-                </div>
-              </div>
+              {PieCharts ? <PieCharts compact /> : <div className="p-2">ExpensePieChart missing</div>}
             </div>
           </div>
 

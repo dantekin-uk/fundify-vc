@@ -27,13 +27,7 @@ export const markAsRealData = async (orgId) => {
  */
 export const shouldShowDemoBanner = (org, user) => {
   if (!org) return false;
-  
-  const isTrulyNewOrg = !org.demoInitializedAt && !org.hasRealData;
-  const hasDemoMode = org.isDemoMode === true;
-  
-  // Show demo banner ONLY for truly new users who just created account
-  // Don't show for existing users who are logging in
-  return hasDemoMode && isTrulyNewOrg && user?.hasCompletedSetup === false;
+  return org.isDemoMode === true && !org.hasRealData;
 };
 
 /**

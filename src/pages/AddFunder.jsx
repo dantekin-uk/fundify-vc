@@ -44,7 +44,7 @@ export default function AddFunder() {
         setShowSuccessAnimation(true);
       } else {
         // For existing users, just navigate directly without animation
-        navigate('/app/dashboard');
+        navigate('/app/dashboard/overview');
       }
       
       // Reset the form

@@ -46,7 +46,7 @@ export default function Projects() {
         setShowSuccessAnimation(true);
       } else {
         // For existing users, just navigate directly without animation
-        navigate('/app/dashboard');
+        navigate('/app/dashboard/overview');
       }
       
       setForm({ name: '', type: 'igp', funderId: '', allocation: '', startDate: '', endDate: '', notes: '' });

@@ -135,6 +135,9 @@ export function FinanceProvider({ children }) {
   const addProject = async (payload) => {
     if (!activeOrgId) return { success: false, error: 'No active organization selected' };
     try {
+      const isDemo = activeOrg?.isDemoMode;
+      const isFirstReal = isDemo && !activeOrg?.hasRealData;
+
       const project = {
         id: `proj-${uid()}`,
         name: String(payload.name || 'Untitled Project'),
@@ -147,6 +150,37 @@ export function FinanceProvider({ children }) {
         createdAt: new Date().toISOString(),
         createdBy: user?.id || 'system',
       };
+
+      if (isFirstReal) {
+        // Demo -> Real transition: Clear all demo data and start fresh
+        const nextProjects = [project];
+        
+        // Update local state first
+        setState((s) => ({
+          ...s,
+          projects: nextProjects,
+          funders: [],
+          incomes: [],
+          expenses: [],
+          logs: []
+        }));
+
+        // Atomic update to Firestore
+        const ref = doc(db, 'orgs', activeOrgId);
+        await updateDoc(ref, {
+          projects: nextProjects,
+          funders: [],
+          incomes: [],
+          expenses: [],
+          logs: [],
+          isDemoMode: false,
+          hasRealData: true,
+          demoInitializedAt: null
+        });
+
+        appendLog('project_created', project.id, project);
+        return { success: true, project };
+      }
 
       // optimistic update
       const nextProjects = [...state.projects, project];
@@ -1099,6 +1133,40 @@ export function FinanceProvider({ children }) {
       createdAt: new Date().toISOString(),
       status: funder?.status || 'active'
     };
+
+    const isDemo = activeOrg?.isDemoMode;
+    const isFirstReal = isDemo && !activeOrg?.hasRealData;
+
+    if (isFirstReal) {
+      // Demo -> Real transition: Clear all demo data and start fresh with this funder
+      const nextFunders = [newFunder];
+
+      // Update local state first
+      setState((s) => ({
+        ...s,
+        funders: nextFunders,
+        projects: [],
+        incomes: [],
+        expenses: [],
+        logs: []
+      }));
+
+      // Atomic update to Firestore
+      const ref = doc(db, 'orgs', activeOrgId);
+      await updateDoc(ref, {
+        funders: nextFunders,
+        projects: [],
+        incomes: [],
+        expenses: [],
+        logs: [],
+        isDemoMode: false,
+        hasRealData: true,
+        demoInitializedAt: null
+      });
+
+      return newFunder.id;
+    }
+
     const prev = Array.isArray(state.funders) ? state.funders : [];
     const nid = String(newFunder.id || '').trim().toLowerCase();
     const nem = String(newFunder.email || '').trim().toLowerCase();

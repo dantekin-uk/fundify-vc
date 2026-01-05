@@ -5,11 +5,14 @@ import { useTheme } from '../context/ThemeContext';
 import { toast } from 'react-toastify';
 import FormInput from '../components/FormInput';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { useNavigate } from 'react-router-dom';
+import { markAsRealData } from '../utils/demoDataHelper';
 
 export default function Settings() {
   const { user, updateUser } = useAuth();
   const { orgs, activeOrg, switchOrg, setOrgCurrency } = useOrg();
   const { isDark, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   const [profile, setProfile] = useState({ name: user?.name || '', email: user?.email || '' });
   const [orgSettings, setOrgSettings] = useState({ currency: activeOrg?.currency || 'USD' });
@@ -41,6 +44,10 @@ export default function Settings() {
       const ok = await setOrgCurrency(orgSettings.currency);
       if (!ok || ok.error) throw new Error((ok && ok.error) || 'Failed to update org');
       toast.success('Organization settings updated');
+      if (activeOrg?.id) {
+        await markAsRealData(activeOrg.id);
+      }
+      navigate('/app/dashboard/overview');
     } catch (e) {
       console.error(e);
       toast.error('Failed to save organization settings');
