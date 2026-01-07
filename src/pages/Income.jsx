@@ -32,7 +32,7 @@ export default function Income() {
 
   const handleSuccessAnimationComplete = () => {
     // Navigate to dashboard after animation completes
-    navigate('/app/dashboard');
+    navigate('/app/dashboard/overview');
   };
 
   const submitProject = async (e) => {
@@ -59,7 +59,7 @@ export default function Income() {
           setShowSuccessAnimation(true);
         } else {
           // For existing users, just navigate directly without animation
-          navigate('/app/dashboard');
+          navigate('/app/dashboard/overview');
         }
         
         setProjForm({ projectId: '', amount: '', date: '', description: '' });
@@ -97,7 +97,7 @@ export default function Income() {
           setShowSuccessAnimation(true);
         } else {
           // For existing users, just navigate directly without animation
-          navigate('/app/dashboard');
+          navigate('/app/dashboard/overview');
         }
         
         setOrgForm({ walletId: 'ORG', amount: '', date: '', description: '' });

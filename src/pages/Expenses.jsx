@@ -36,7 +36,7 @@ export default function Expenses() {
 
   const handleSuccessAnimationComplete = () => {
     // Navigate to dashboard after animation completes
-    navigate('/app/dashboard');
+    navigate('/app/dashboard/overview');
   };
 
   const submitProject = async (e) => {
@@ -63,7 +63,7 @@ export default function Expenses() {
           setShowSuccessAnimation(true);
         } else {
           // For existing users, just navigate directly without animation
-          navigate('/app/dashboard');
+          navigate('/app/dashboard/overview');
         }
         
         setProjForm({ projectId: '', category: 'Operations', amount: '', date: '', description: '' });
@@ -110,7 +110,7 @@ export default function Expenses() {
           setShowSuccessAnimation(true);
         } else {
           // For existing users, just navigate directly without animation
-          navigate('/app/dashboard');
+          navigate('/app/dashboard/overview');
         }
         
         setWalletForm({ walletId: 'ORG', category: 'Operations', amount: '', date: '', description: '' });

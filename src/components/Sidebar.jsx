@@ -265,16 +265,16 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
               if (collapsed && item.name === 'Recent') {
                 return (
                   <div key={item.name} className="sidebar-group px-2 py-4">
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="flex flex-col gap-1.5">
                       {item.children.map((child) => (
                         <Link
                           key={child.name + child.href}
                           to={child.href}
                           title={child.name}
                           onClick={() => { if (onNavigate) onNavigate(); }}
-                          className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-600 active:bg-sky-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-sky-400 dark:active:bg-slate-600 transition-colors duration-150"
+                          className="w-10 h-10 mx-auto flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-600 active:bg-sky-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-sky-400 dark:active:bg-slate-600 transition-colors duration-150"
                         >
-                          {child.icon ? <child.icon className="h-4 w-4" /> : <span className="h-4 w-4" />}
+                          {child.icon ? <child.icon className="h-4 w-4" /> : <HomeIcon className="h-4 w-4" />}
                         </Link>
                       ))}
                     </div>

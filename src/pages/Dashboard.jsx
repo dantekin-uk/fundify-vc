@@ -35,7 +35,7 @@ const Dashboard = () => {
   const [showDemoBanner, setShowDemoBanner] = useState(false);
   const [initializingDemo, setInitializingDemo] = useState(false);
 
-  const { currency, activeOrgId, orgs } = useOrg();
+  const { currency, activeOrgId, orgs, loading, activeOrg } = useOrg();
   const { paymentMethods, deletePaymentMethod, setDefaultPaymentMethod } = usePayment();
   const {
     stats = [],
@@ -50,30 +50,14 @@ const Dashboard = () => {
   } = useFinance() || {};
 
   useEffect(() => {
-    if (!activeOrgId) {
+    if (!activeOrgId || loading) {
       setShowDemoBanner(false);
       return;
     }
-
-    try {
-      const empty = isEmptyOrganization(funders || [], projects || [], incomes || [], expenses || []);
-      const demo = isDemoMode(funders || [], projects || [], incomes || [], expenses || []);
-      
-      // Get current organization data to check if it's a new organization
-      const currentOrg = orgs?.find(o => o.id === activeOrgId);
-
-      if (demo) {
-        const shouldShow = shouldShowDemoBanner(currentOrg, user);
-        setShowDemoBanner(shouldShow);
-        return;
-      }
-
-      setShowDemoBanner(false);
-    } catch (error) {
-      console.error('Error checking demo mode:', error);
-      setShowDemoBanner(false);
-    }
-  }, [funders?.length || 0, projects?.length || 0, incomes?.length || 0, expenses?.length || 0, activeOrgId, currency, initializingDemo, user?.hasCompletedSetup, orgs]);
+    const currentOrg = orgs?.find(o => o.id === activeOrgId) || activeOrg;
+    const shouldShow = shouldShowDemoBanner(currentOrg, user);
+    setShowDemoBanner(shouldShow);
+  }, [activeOrgId, loading, orgs, activeOrg, user?.hasCompletedSetup]);
 
   // Clear demo data and start fresh
   const clearDemoData = async () => {
@@ -136,7 +120,7 @@ const Dashboard = () => {
     .reduce((sum, e) => sum + e.amount, 0);
 
   // Add organization as a funding source
-  const activeOrg = orgs?.find(o => o.id === activeOrgId);
+  const activeOrgResolved = activeOrg || orgs?.find(o => o.id === activeOrgId);
   
   // Calculate organization totals from all transactions
   const orgTotals = useMemo(() => {
@@ -158,11 +142,11 @@ const Dashboard = () => {
     const rows = [...(fundingRows?.rows || [])];
     
     // Add organization as a funding source if it has any activity
-    if (activeOrg && (orgTotals.income !== 0 || orgTotals.expenses !== 0 || orgTotals.available !== 0)) {
+    if (activeOrgResolved && (orgTotals.income !== 0 || orgTotals.expenses !== 0 || orgTotals.available !== 0)) {
       const orgRow = {
         funder: {
           id: 'ORG',
-          name: activeOrg.name || 'Organization',
+          name: activeOrgResolved.name || 'Organization',
           type: 'organization'
         },
         income: orgTotals.income,
@@ -175,7 +159,7 @@ const Dashboard = () => {
     }
     
     return rows;
-  }, [fundingRows?.rows, activeOrg, orgTotals]);
+  }, [fundingRows?.rows, activeOrgResolved, orgTotals]);
 
   const enhancedFundingMetricMaxVal = (enhancedFundingRows?.length)
     ? Math.max(...enhancedFundingRows.map((r) => Math.abs(Number(r?.[fundingMetric] || 0))), 1)
@@ -201,7 +185,7 @@ const Dashboard = () => {
   };
 
   const isEmpty = isEmptyOrganization(funders || [], projects || [], incomes || [], expenses || []);
-  const isDemo = isDemoMode(funders || [], projects || [], incomes || [], expenses || []);
+  const isDemo = activeOrg?.isDemoMode === true && !activeOrg?.hasRealData;
 
   return (
     <div className="space-y-6">
@@ -256,7 +240,7 @@ const Dashboard = () => {
       )}
 
       {/* Setup Actions for Empty/Demo Organizations */}
-      {(showDemoBanner || isEmpty) && (
+      {(showDemoBanner || (isEmpty && isDemo)) && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link to="/app/funders/add" className="group">
             <div className="bg-white dark:bg-slate-900 rounded-xl border-2 border-slate-200 dark:border-slate-700 p-6 hover:border-slate-900 dark:hover:border-slate-500 transition-all duration-200 hover:shadow-lg">
