@@ -612,6 +612,10 @@ export function FinanceProvider({ children }) {
       amount: Number(payload.amount || 0),
       date: payload.date || new Date().toISOString(),
       description: payload.description || '',
+      paidVia: payload.paidVia || null,
+      mpesaCode: payload.mpesaCode || null,
+      importBatchId: payload.importBatchId || null,
+      source: payload.source || null,
       status: approvalsEnabled && !isAdmin ? 'pending' : 'posted',
       attachments: payload.attachments || [],
       currency: payload.currency || orgCurrency || 'USD',
@@ -715,6 +719,29 @@ export function FinanceProvider({ children }) {
       appendLog('expense_rejected', id, { reason });
       return next;
     });
+  };
+
+  const updateExpense = (id, patch) => {
+    const canUpdate = (orgRole === 'admin' || orgRole === 'financial_officer');
+    if (!canUpdate) {
+      appendLog('expense_update_denied_insufficient_role', id, { byRole: orgRole });
+      return { success: false, error: 'You do not have permission to update expenses.' };
+    }
+    if (!id || !patch || typeof patch !== 'object') {
+      return { success: false, error: 'Invalid update payload' };
+    }
+    let ok = false;
+    setState((s) => {
+      const exists = s.expenses.find((e) => e.id === id);
+      if (!exists) return s;
+      const updated = s.expenses.map((e) => (e.id === id ? { ...e, ...patch } : e));
+      const next = { ...s, expenses: updated };
+      syncToFirestore('expenses', next.expenses);
+      appendLog('expense_updated', id, patch);
+      ok = true;
+      return next;
+    });
+    return { success: ok };
   };
 
   const postPendingExpense = (id) => {
@@ -1237,6 +1264,7 @@ export function FinanceProvider({ children }) {
     // approvals and management
     approveExpense,
     rejectExpense,
+    updateExpense,
     approveIncome,
     rejectIncome,
     postPendingExpense,
@@ -1264,6 +1292,7 @@ export function FinanceProvider({ children }) {
     refreshData,
     approveExpense,
     rejectExpense,
+    updateExpense,
     approveIncome,
     rejectIncome,
     postPendingExpense,

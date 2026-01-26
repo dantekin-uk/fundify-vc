@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useOrg } from '../context/OrgContext';
 import { useFinance } from '../context/FinanceContext';
@@ -9,8 +9,6 @@ import {
   BellIcon,
   SunIcon,
   MoonIcon,
-  UserCircleIcon,
-  ArrowLeftOnRectangleIcon,
   Bars3Icon
 } from '@heroicons/react/24/outline';
 
@@ -21,10 +19,18 @@ const Navbar = ({ onMobileMenuToggle }) => {
   const { expenses, incomes } = useFinance();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
-
-  const accountDisplayName = (user?.email || '').split('@')[0] || 'User';
+  const menuRef = useRef(null);
   const pendingCount = ((expenses || []).filter((e) => e.status === 'pending').length) +
                       ((incomes || []).filter((i) => i.status === 'pending').length);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target)) setUserDropdownOpen(false);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -68,9 +74,9 @@ const Navbar = ({ onMobileMenuToggle }) => {
   return (
     <div className="sticky top-0 z-40 relative bg-white/80 text-gray-900 backdrop-blur-sm border-b border-gray-200 shadow-sm dark:bg-slate-900/70 dark:text-slate-100 dark:border-slate-800">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
-        <div className="flex items-center justify-between gap-4 py-3">
+        <div className="flex items-center justify-between gap-2 sm:gap-4 py-3 min-w-0">
           {/* Left section - Mobile menu button */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={onMobileMenuToggle}
               title="Open sidebar"
@@ -82,24 +88,24 @@ const Navbar = ({ onMobileMenuToggle }) => {
           </div>
 
           {/* Center section - Search */}
-          <div className="flex-1 px-4 hidden sm:block">
-            <div className="max-w-xl mx-auto">
+          <div className="flex-1 px-2 sm:px-4 hidden md:block min-w-0">
+            <div className="max-w-xs lg:max-w-md xl:max-w-lg mx-auto w-full">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <MagnifyingGlassIcon className="h-4 w-4 md:h-5 md:w-5 text-gray-400 dark:text-slate-500" />
                 </div>
                 <input
                   placeholder="Search"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-50 placeholder:text-gray-400 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-700"
+                  className="w-full pl-10 pr-4 py-2 rounded-2xl bg-gray-50 placeholder:text-gray-400 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-700"
                 />
               </div>
             </div>
           </div>
 
           {/* Right section - Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {/* Quick actions - hidden on mobile */}
-            <div className="items-center gap-3 hidden md:flex">
+            <div className="items-center gap-3 hidden lg:flex">
               <OrgSelector />
               <Link to="/app/income" className="px-3.5 py-2 rounded-xl bg-gray-900 text-white hover:shadow-md">Income</Link>
               <Link to="/app/expenses" className="px-3.5 py-2 rounded-xl bg-white text-gray-700 hover:shadow-sm ring-1 ring-gray-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">Expenses</Link>
@@ -125,13 +131,30 @@ const Navbar = ({ onMobileMenuToggle }) => {
               )}
             </button>
 
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle theme"
+              className="p-2 rounded-full bg-white/90 shadow-sm ring-1 ring-gray-200 hover:shadow-md transition transform hover:-translate-y-0.5 focus:outline-none dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-700"
+            >
+              {isDark ? (
+                <SunIcon className="h-6 w-6 text-gray-700 dark:text-slate-100" />
+              ) : (
+                <MoonIcon className="h-6 w-6 text-gray-700 dark:text-slate-100" />
+              )}
+            </button>
+
             {/* User menu */}
-            <div className="relative">
+            <div className="relative" ref={menuRef}>
               <button
                 title={user?.name || 'User menu'}
                 aria-label={`User menu ${user?.name || ''}`}
-                onClick={() => setUserDropdownOpen(!setUserDropdownOpen)}
-                className="flex items-center gap-2 p-1 rounded-full bg-white/90 shadow-sm ring-1 ring-gray-200 hover:shadow-md transition transform hover:-translate-y-0.5 focus:outline-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUserDropdownOpen((v) => !v);
+                }}
+                className="flex items-center gap-2 p-1 rounded-full bg-white/90 shadow-sm ring-1 ring-gray-200 hover:shadow-md transition transform hover:-translate-y-0.5 focus:outline-none dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-700"
               >
                 <div className="h-8 w-8 rounded-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm">
                   {user?.name?.charAt(0)?.toUpperCase() || 'U'}
@@ -144,6 +167,13 @@ const Navbar = ({ onMobileMenuToggle }) => {
                     <div className="font-medium">{user?.name || 'User'}</div>
                     <div className="truncate text-gray-500 text-xs dark:text-slate-400">{user?.email || ''}</div>
                   </div>
+                  <Link
+                    to="/app/settings"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-slate-700"
+                  >
+                    Settings
+                  </Link>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-slate-700">Sign out</button>
                 </div>
               )}

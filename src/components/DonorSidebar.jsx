@@ -1,6 +1,4 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import {
   HomeIcon,
   ChartBarIcon,
@@ -8,17 +6,12 @@ import {
   FolderIcon,
   DocumentTextIcon,
   Cog6ToothIcon,
-  ArrowLeftOnRectangleIcon,
-  SunIcon,
-  MoonIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 
 export default function DonorSidebar({ collapsed, onToggleCollapse, onNavigate }) {
   const location = useLocation();
-  const { user, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
 
   const nav = [
     { name: 'Dashboard', href: '/donor', icon: HomeIcon },
@@ -86,43 +79,6 @@ export default function DonorSidebar({ collapsed, onToggleCollapse, onNavigate }
             );
           })}
         </nav>
-      </div>
-
-      {/* Bottom actions */}
-      <div className={`px-4 py-4 space-y-3 ${collapsed ? 'flex flex-col items-center justify-center' : ''}`}>
-        {collapsed ? (
-          <button
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label="Toggle dark mode"
-            onClick={toggleTheme}
-            className="w-10 h-10 flex items-center justify-center rounded-md bg-white/90 text-gray-700 hover:bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-700"
-          >
-            {isDark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-          </button>
-        ) : (
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle dark mode"
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-white/90 text-gray-700 hover:bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-700"
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-            <span className="text-sm">{isDark ? 'Light mode' : 'Dark mode'}</span>
-          </button>
-        )}
-
-        {user && (
-          collapsed ? (
-            <button title="Sign out" onClick={logout} className="w-10 h-10 flex items-center justify-center rounded-md bg-white text-gray-700 hover:bg-gray-50 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
-              <ArrowLeftOnRectangleIcon className="h-5 w-5" />
-            </button>
-          ) : (
-            <button onClick={logout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-white text-gray-700 hover:bg-gray-50 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
-              <ArrowLeftOnRectangleIcon className="h-5 w-5" />
-              Sign out
-            </button>
-          )
-        )}
       </div>
     </div>
   );

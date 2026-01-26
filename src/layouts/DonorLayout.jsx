@@ -2,13 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFinance } from '../context/FinanceContext';
-import { BellIcon, ChevronDownIcon, MagnifyingGlassIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { useTheme } from '../context/ThemeContext';
+import { BellIcon, ChevronDownIcon, MagnifyingGlassIcon, MoonIcon, SunIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 import DonorSidebar from '../components/DonorSidebar';
 import { AnimatePresence, motion } from 'framer-motion';
 
 export default function DonorLayout() {
   const { user, logout } = useAuth();
   const { byFunder } = useFinance();
+  const { isDark, toggleTheme } = useTheme();
   const [showMenu, setShowMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
   const [desktopCollapsed, setDesktopCollapsed] = useState(() => {
@@ -16,7 +18,6 @@ export default function DonorLayout() {
   }); // desktop
   const menuRef = useRef(null);
   const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const handler = (e) => { if (!menuRef.current) return; if (!menuRef.current.contains(e.target)) setShowMenu(false); };
@@ -88,6 +89,20 @@ export default function DonorLayout() {
             <button className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" title="Notifications">
               <BellIcon className="h-6 w-6 text-slate-600 dark:text-slate-300" />
             </button>
+
+            <button
+              onClick={toggleTheme}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle theme"
+              className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              {isDark ? (
+                <SunIcon className="h-6 w-6 text-slate-600 dark:text-slate-300" />
+              ) : (
+                <MoonIcon className="h-6 w-6 text-slate-600 dark:text-slate-300" />
+              )}
+            </button>
+
             <div className="relative" ref={menuRef}>
               <button onClick={() => setShowMenu(v=>!v)} className="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700">
                 <UserCircleIcon className="h-6 w-6 text-slate-600 dark:text-slate-300" />
@@ -95,8 +110,13 @@ export default function DonorLayout() {
                 <ChevronDownIcon className="h-4 w-4 text-slate-400" />
               </button>
               {showMenu && (
-                <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-slate-800 rounded-lg shadow ring-1 ring-slate-200 dark:ring-slate-700 overflow-hidden">
-                  <button onClick={logout} className="w-full text-left text-sm px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">Logout</button>
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg shadow ring-1 ring-slate-200 dark:ring-slate-700 overflow-hidden">
+                  <div className="px-4 py-2 text-sm border-b border-slate-200 dark:border-slate-700">
+                    <div className="font-medium text-slate-900 dark:text-slate-100">{user?.name || 'User'}</div>
+                    <div className="truncate text-xs text-slate-500 dark:text-slate-400">{user?.email || ''}</div>
+                  </div>
+                  <Link to="/donor/settings" onClick={() => setShowMenu(false)} className="block w-full text-left text-sm px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">Settings</Link>
+                  <button onClick={logout} className="w-full text-left text-sm px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">Sign out</button>
                 </div>
               )}
             </div>

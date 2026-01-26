@@ -21,13 +21,15 @@ export default function Layout() {
       <GlobalNotifier />
 
       {/* Desktop Sidebar */}
-      <div className={`hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col lg:z-50 lg:rounded-tr-2xl lg:rounded-br-2xl lg:shadow-xl lg:overflow-hidden transition-all duration-200 ${desktopCollapsed ? 'lg:w-20' : 'lg:w-64'}`}>
+      <div className={`hidden md:fixed md:inset-y-0 md:flex md:flex-col md:z-50 md:rounded-tr-2xl md:rounded-br-2xl md:shadow-xl md:overflow-hidden transition-all duration-200 ${desktopCollapsed ? 'md:w-20' : 'md:w-64'}`}>
         <Sidebar collapsed={desktopCollapsed} onToggleCollapse={() => setDesktopCollapsed(!desktopCollapsed)} />
       </div>
 
       {/* Main Content */}
-      <div className={`${desktopCollapsed ? 'lg:pl-20' : 'lg:pl-64'} pt-16 min-h-screen`}>
-        <Outlet />
+      <div className={`${desktopCollapsed ? 'md:pl-20' : 'md:pl-64'} pt-16 min-h-screen`}>
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+          <Outlet />
+        </div>
       </div>
 
       {/* Mobile sidebar overlay */}

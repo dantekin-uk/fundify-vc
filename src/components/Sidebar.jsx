@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { useOrg } from '../context/OrgContext';
 import { useFinance } from '../context/FinanceContext';
 import {
@@ -14,9 +13,6 @@ import {
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
   HeartIcon,
-  ArrowLeftOnRectangleIcon,
-  SunIcon,
-  MoonIcon,
   PlusIcon,
   GlobeAltIcon,
   ChevronRightIcon,
@@ -24,15 +20,12 @@ import {
   ChevronLeftIcon,
   CreditCardIcon
 } from '@heroicons/react/24/outline';
-import { useTheme } from '../context/ThemeContext';
 import { useState, useEffect } from 'react';
 
 const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
   const location = useLocation();
-  const { user, logout } = useAuth();
   const { role } = useOrg();
   const { expenses, incomes, funders } = useFinance();
-  const { isDark, toggleTheme } = useTheme();
 
   const [openGroups, setOpenGroups] = useState(() => ({ Recent: false }));
   const toggleGroup = (name) => {
@@ -115,6 +108,7 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
         name: 'Reports', icon: ChartBarIcon, roles: ['admin','donor'],
         children: [
           { name: 'Overview Reports', href: '/app/reports', icon: ChartBarIcon, roles: ['admin','donor'] },
+          { name: 'Generate Reports', href: '/app/reports/import', icon: ChartBarIcon, roles: ['admin','donor'] },
         ]
       },
 
@@ -205,10 +199,6 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
       }
     }
   });
-
-  const handleLogout = () => {
-    logout();
-  };
 
   return (
     <div className={`flex min-h-0 flex-1 flex-col sidebar-modern bg-white dark:bg-slate-900 ${collapsed ? 'w-20' : 'w-64'} transition-all duration-300 ease-in-out`}>
@@ -370,78 +360,6 @@ const Sidebar = ({ collapsed, onToggleCollapse, onNavigate }) => {
             );
           })}
         </nav>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className={`flex-shrink-0 border-t border-slate-200 dark:border-slate-700/50 ${collapsed ? 'px-2 py-4 flex flex-col items-center gap-2' : 'px-3 py-4 space-y-2.5'}`}>
-        {/* Action buttons grid when collapsed */}
-        {collapsed ? (
-          <div className="grid grid-cols-3 gap-1.5 w-full">
-            {/* Theme toggle */}
-            <button
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              aria-label="Toggle dark mode"
-              onClick={toggleTheme}
-              className="h-10 w-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-600 active:bg-sky-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-sky-400 dark:active:bg-slate-600 transition-colors duration-150"
-            >
-              {isDark ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
-            </button>
-
-            {/* Settings */}
-            <Link to="/app/settings" onClick={() => { closeAllGroups(); if (onNavigate) onNavigate(); }} title="Settings" className="h-10 w-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-600 active:bg-sky-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-sky-400 dark:active:bg-slate-600 transition-colors duration-150">
-              <Cog6ToothIcon className="h-4 w-4" />
-            </Link>
-
-            {/* Sign out */}
-            {user && (
-              <button title="Sign out" onClick={handleLogout} className="h-10 w-10 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-rose-100 hover:text-rose-600 active:bg-rose-200 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-rose-400 dark:active:bg-slate-600 transition-colors duration-150">
-                <ArrowLeftOnRectangleIcon className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* User profile section */}
-            {user && (
-              <div className="px-3 py-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                    {(user?.email || user?.name || '?')[0].toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-50 truncate">{user?.name || 'User'}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Theme toggle (expanded) */}
-            <button
-              onClick={toggleTheme}
-              aria-label="Toggle dark mode"
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-150"
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDark ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
-              <span className="text-sm font-medium">{isDark ? 'Light' : 'Dark'}</span>
-            </button>
-
-            {/* Settings (expanded) */}
-            <Link to="/app/settings" onClick={() => { closeAllGroups(); if (onNavigate) onNavigate(); }} title="Settings" className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-150">
-              <Cog6ToothIcon className="h-4 w-4 flex-shrink-0" />
-              <span className="text-sm font-medium">Settings</span>
-            </Link>
-
-            {/* Sign out (expanded) */}
-            {user && (
-              <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-400 transition-colors duration-150">
-                <ArrowLeftOnRectangleIcon className="h-4 w-4 flex-shrink-0" />
-                <span className="text-sm font-medium">Sign out</span>
-              </button>
-            )}
-          </>
-        )}
       </div>
     </div>
   );

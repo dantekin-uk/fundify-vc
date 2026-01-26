@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useFinance } from '../context/FinanceContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
@@ -25,7 +26,11 @@ function downloadCSV(filename, rows) {
 }
 
 export default function Reports() {
-  const { totals: rawTotals, byFunder: rawByFunder, byProject: rawByProject } = useFinance();
+  const {
+    totals: rawTotals,
+    byFunder: rawByFunder,
+    byProject: rawByProject,
+  } = useFinance();
   // provide safe defaults to avoid runtime errors when data is not yet loaded
   const totals = rawTotals || { totalIncome: 0, totalExpenses: 0, totalAvailable: 0 };
   const byFunder = Array.isArray(rawByFunder) ? rawByFunder : [];
@@ -50,28 +55,36 @@ export default function Reports() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">Reports</h2>
-          <p className="mt-1 text-sm text-slate-500">Key totals and downloadable summaries by funder and project.</p>
+          <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-slate-100 sm:truncate sm:text-3xl sm:tracking-tight">Reports</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Key totals and downloadable summaries by funder and project.</p>
+        </div>
+        <div>
+          <Link
+            to="/app/reports/import"
+            className="inline-flex items-center px-3 py-2 rounded-md bg-sky-600 text-white text-sm hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
+          >
+            Generate Reports
+          </Link>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-500">Total income</div>
-            <div className="text-2xl font-semibold text-gray-700">{formatAmount(totals.totalIncome || 0)}</div>
+            <div className="text-sm text-gray-500 dark:text-slate-400">Total income</div>
+            <div className="text-2xl font-semibold text-gray-700 dark:text-slate-100">{formatAmount(totals.totalIncome || 0)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-500">Total expenses</div>
+            <div className="text-sm text-gray-500 dark:text-slate-400">Total expenses</div>
             <div className="text-2xl font-semibold text-red-600">{formatAmount(totals.totalExpenses || 0)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-500">Funds available</div>
-            <div className="text-2xl font-semibold">{formatAmount(totals.totalAvailable || 0)}</div>
+            <div className="text-sm text-gray-500 dark:text-slate-400">Funds available</div>
+            <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{formatAmount(totals.totalAvailable || 0)}</div>
           </CardContent>
         </Card>
       </div>
@@ -80,32 +93,32 @@ export default function Reports() {
         <CardHeader>
           <div className="flex items-center justify-between w-full">
             <CardTitle>By funder</CardTitle>
-            <button onClick={()=>downloadCSV('by_funder.csv', funderRows)} className="text-sm font-medium text-slate-700 hover:underline">Export CSV</button>
+            <button onClick={()=>downloadCSV('by_funder.csv', funderRows)} className="text-sm font-medium text-slate-700 hover:underline dark:text-slate-200">Export CSV</button>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-left text-sm font-semibold text-gray-900">Funder</th>
-                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900">Allocation</th>
-                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900">Income</th>
-                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900">Expenses</th>
-                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900">Available</th>
+                  <th className="px-3 py-2 text-left text-sm font-semibold text-gray-900 dark:text-slate-100">Funder</th>
+                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900 dark:text-slate-100">Allocation</th>
+                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900 dark:text-slate-100">Income</th>
+                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900 dark:text-slate-100">Expenses</th>
+                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900 dark:text-slate-100">Available</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
                 {funderRows.map((r)=> (
                   <tr key={r.funder}>
-                    <td className="px-3 py-2 text-sm">{r.funder}</td>
-                    <td className="px-3 py-2 text-sm text-right">{formatAmount(r.allocation)}</td>
-                    <td className="px-3 py-2 text-sm text-right text-gray-700">{formatAmount(r.income)}</td>
+                    <td className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100">{r.funder}</td>
+                    <td className="px-3 py-2 text-sm text-right text-slate-900 dark:text-slate-100">{formatAmount(r.allocation)}</td>
+                    <td className="px-3 py-2 text-sm text-right text-gray-700 dark:text-slate-200">{formatAmount(r.income)}</td>
                     <td className="px-3 py-2 text-sm text-right text-red-600">{formatAmount(r.expenses)}</td>
-                    <td className="px-3 py-2 text-sm text-right font-medium">{formatAmount(r.available)}</td>
+                    <td className="px-3 py-2 text-sm text-right font-medium text-slate-900 dark:text-slate-100">{formatAmount(r.available)}</td>
                   </tr>
                 ))}
-                {funderRows.length === 0 && (<tr><td className="px-3 py-4 text-sm text-gray-500" colSpan={5}>No data.</td></tr>)}
+                {funderRows.length === 0 && (<tr><td className="px-3 py-4 text-sm text-gray-500 dark:text-slate-400" colSpan={5}>No data.</td></tr>)}
               </tbody>
             </table>
           </div>
@@ -116,30 +129,30 @@ export default function Reports() {
         <CardHeader>
           <div className="flex items-center justify-between w-full">
             <CardTitle>By project</CardTitle>
-            <button onClick={()=>downloadCSV('by_project.csv', projectRows)} className="text-sm font-medium text-slate-700 hover:underline">Export CSV</button>
+            <button onClick={()=>downloadCSV('by_project.csv', projectRows)} className="text-sm font-medium text-slate-700 hover:underline dark:text-slate-200">Export CSV</button>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-left text-sm font-semibold text-gray-900">Project</th>
-                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900">Income</th>
-                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900">Expenses</th>
-                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900">Available</th>
+                  <th className="px-3 py-2 text-left text-sm font-semibold text-gray-900 dark:text-slate-100">Project</th>
+                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900 dark:text-slate-100">Income</th>
+                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900 dark:text-slate-100">Expenses</th>
+                  <th className="px-3 py-2 text-right text-sm font-semibold text-gray-900 dark:text-slate-100">Available</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
                 {projectRows.map((r)=> (
                   <tr key={r.project}>
-                    <td className="px-3 py-2 text-sm">{r.project}</td>
-                    <td className="px-3 py-2 text-sm text-right text-gray-700">{formatAmount(r.income)}</td>
+                    <td className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100">{r.project}</td>
+                    <td className="px-3 py-2 text-sm text-right text-gray-700 dark:text-slate-200">{formatAmount(r.income)}</td>
                     <td className="px-3 py-2 text-sm text-right text-red-600">{formatAmount(r.expenses)}</td>
-                    <td className="px-3 py-2 text-sm text-right font-medium">{formatAmount(r.available)}</td>
+                    <td className="px-3 py-2 text-sm text-right font-medium text-slate-900 dark:text-slate-100">{formatAmount(r.available)}</td>
                   </tr>
                 ))}
-                {projectRows.length === 0 && (<tr><td className="px-3 py-4 text-sm text-gray-500" colSpan={4}>No data.</td></tr>)}
+                {projectRows.length === 0 && (<tr><td className="px-3 py-4 text-sm text-gray-500 dark:text-slate-400" colSpan={4}>No data.</td></tr>)}
               </tbody>
             </table>
           </div>

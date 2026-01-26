@@ -19,11 +19,11 @@ import Funders from './pages/Funders';
 import Income from './pages/Income';
 import Projects from './pages/Projects';
 import Expenses from './pages/Expenses';
-import FirebaseTest from './components/FirebaseTest';
 import Approvals from './pages/Approvals';
 import Audit from './pages/Audit';
 import Reports from './pages/Reports';
 import ReportsFunder from './pages/ReportsFunder';
+import ReportsImport from './pages/ReportsImport';
 import AddFunder from './pages/AddFunder';
 import LoginModal from './components/LoginModal';
 import Members from './pages/Members';
@@ -44,6 +44,7 @@ import DonorHomeRedirect from './pages/DonorHomeRedirect';
 import DonorPaymentSuccess from './pages/DonorPaymentSuccess';
 import DonorPaymentCancel from './pages/DonorPaymentCancel';
 import IntegrationPage from './pages/IntegrationPage';
+import FirebaseTest from './components/FirebaseTest';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -140,15 +141,9 @@ function AppContent() {
       {showLoginModal && <LoginModal onClose={closeLogin} />}
       <Routes>
         {/* Public marketing landing page at root */}
-        {/* Temporary route for testing Firebase connection */}
-        <Route path="/firebase-test" element={<FirebaseTest />} />
-        
         <Route path="/" element={
           <PublicRoute>
-            <>
-              <FirebaseTest />
-              <Landing />
-            </>
+            <Landing />
           </PublicRoute>
         } />
         {/* Optional alias */}
@@ -178,6 +173,7 @@ function AppContent() {
           <Route path="members" element={<Navigate to="/app/accounts" replace />} />
           <Route path="audit" element={<Audit />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="reports/import" element={<ReportsImport />} />
           <Route path="reports/funder/:id" element={<ReportsFunder />} />
           <Route path="settings" element={<Settings />} />
           <Route path="integration" element={<IntegrationPage orgId={useOrg()?.activeOrgId} />} />

@@ -18,7 +18,6 @@ import Funders from './pages/Funders';
 import Income from './pages/Income';
 import Projects from './pages/Projects';
 import Expenses from './pages/Expenses';
-import FirebaseTest from './components/FirebaseTest';
 import Approvals from './pages/Approvals';
 import Audit from './pages/Audit';
 import Reports from './pages/Reports';
@@ -82,15 +81,9 @@ function AppContent() {
       {showLoginModal && <LoginModal onClose={closeLogin} />}
       <Routes>
         {/* Public marketing landing page at root */}
-        {/* Temporary route for testing Firebase connection */}
-        <Route path="/firebase-test" element={<FirebaseTest />} />
-        
         <Route path="/" element={
           <PublicRoute>
-            <>
-              <FirebaseTest />
-              <Landing />
-            </>
+            <Landing />
           </PublicRoute>
         } />
         {/* Optional alias */}
