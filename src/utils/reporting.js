@@ -263,11 +263,12 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     const amount = parseAmount(pick(r, ['amount', 'amt']));
     let category = String(pick(r, ['category']) ?? '').trim();
     let payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier']) ?? '').trim();
-    const description = String(pick(r, ['description', 'purpose', 'narration']) ?? '').trim();
+    const description = String(pick(r, ['expenditure', 'description', 'purpose', 'narration']) ?? '').trim();
     const paymentMethod = String(pick(r, ['paymentMethod', 'payment_method', 'paid_via', 'paidvia', 'method']) ?? defaultPaymentMethod).trim() || defaultPaymentMethod;
     const referenceCodeRaw = String(pick(r, ['referenceCode', 'reference_code', 'mpesa_reference', 'mpesa_code', 'mpesa_referral', 'mpesa', 'reference']) ?? '').trim();
     const projectName = String(pick(r, ['projectName', 'project_name', 'project']) ?? '').trim();
     const transactionIdRaw = String(pick(r, ['transactionId', 'transaction_id', 'id']) ?? '').trim();
+    const phoneNumberRaw = String(pick(r, ['phoneNumber', 'phone_number', 'msisdn', 'phone']) ?? '').trim();
 
     if (!date || isNaN(date.getTime())) { ignored++; continue; }
     if (!Number.isFinite(amount) || amount <= 0) { ignored++; continue; }
@@ -293,6 +294,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
       category,
       payeeName,
       description,
+      phoneNumber: phoneNumberRaw || null,
       amount,
       paymentMethod: paymentMethod || null,
       referenceCode: referenceCode || null,
@@ -391,4 +393,3 @@ export function buildIntelligenceInsights(transactions) {
 
   return insights;
 }
-

@@ -127,7 +127,7 @@ export default function ReportsImport() {
         dateOfPayment: '2026-01-15',
         category: 'Staff Costs',
         payeeName: 'Jane Doe',
-        description: 'Project coordinator salary',
+        expenditure: 'Project coordinator salary',
         amount: '10000',
         paymentMethod: 'MPESA',
         referenceCode: '',
@@ -142,7 +142,7 @@ export default function ReportsImport() {
         dateOfPayment: '2026-01-05',
         category: 'Travel & Transport',
         payeeName: 'ABC Taxi Services',
-        description: 'Airport pickup for field team',
+        expenditure: 'Airport pickup for field team',
         amount: '2500',
         paymentMethod: 'MPESA',
         referenceCode: 'QWE123ABC9',
@@ -152,7 +152,7 @@ export default function ReportsImport() {
         dateOfPayment: '2026-01-10',
         category: 'Operations',
         payeeName: 'Office Supplies Ltd',
-        description: 'Stationery and printing',
+        expenditure: 'Stationery and printing',
         amount: '7500',
         paymentMethod: 'BANK TRANSFER',
         referenceCode: '',
@@ -184,11 +184,12 @@ export default function ReportsImport() {
     return filteredExpenses.map((e) => ({
       date: e.date ? new Date(e.date).toLocaleDateString() : '',
       category: e.category || '',
-      description: e.description || '',
+      expenditure: e.description || '',
       amount: e.amount ?? 0,
-      currency: e.currency || '',
+      currency: 'KES',
       paid_via: e.paidVia || '',
-      mpesa_code: e.mpesaCode || '',
+      mpesa_reference: e.mpesaCode || '',
+      phone_number: '',
       status: e.status || '',
     }));
   }, [filteredExpenses]);
@@ -273,8 +274,10 @@ export default function ReportsImport() {
       const idxAmount = headerIdx('amount');
       const idxCategory = headerIdx('category');
       const idxDescription = headerIdx('description');
+      const idxExpenditure = headerIdx('expenditure');
       const idxPaidVia = Math.max(headerIdx('paid_via'), headerIdx('paidvia'), headerIdx('payment_method'));
-      const idxMpesaCode = Math.max(headerIdx('mpesa_code'), headerIdx('mpesacode'), headerIdx('mpesa'));
+      const idxMpesaCode = Math.max(headerIdx('mpesa_code'), headerIdx('mpesacode'), headerIdx('mpesa'), headerIdx('mpesa_referral'));
+      const idxPhoneNumber = Math.max(headerIdx('phone_number'), headerIdx('phonenumber'), headerIdx('phone'));
       const idxProject = Math.max(headerIdx('project'), headerIdx('project_name'));
 
       const rows = [];
@@ -300,8 +303,9 @@ export default function ReportsImport() {
         const paidVia = idxPaidVia >= 0 ? String(line[idxPaidVia] || '').trim() : '';
         const mpesaCode = idxMpesaCode >= 0 ? String(line[idxMpesaCode] || '').trim() : '';
         const category = idxCategory >= 0 ? String(line[idxCategory] || '').trim() : '';
-        const description = idxDescription >= 0 ? String(line[idxDescription] || '').trim() : '';
+        const description = (idxExpenditure >= 0 ? String(line[idxExpenditure] || '').trim() : (idxDescription >= 0 ? String(line[idxDescription] || '').trim() : ''));
         const projectName = idxProject >= 0 ? String(line[idxProject] || '').trim() : '';
+        const phoneNumber = idxPhoneNumber >= 0 ? String(line[idxPhoneNumber] || '').trim() : '';
 
         let projectId = null;
         if (projectName) {
@@ -316,6 +320,7 @@ export default function ReportsImport() {
           description,
           paidVia,
           mpesaCode,
+          phoneNumber,
           projectId,
           projectName,
           _rowIndex: r,
@@ -375,9 +380,10 @@ export default function ReportsImport() {
         date: '2026-01-25',
         amount: '1500',
         category: 'Transport',
-        description: 'Field visit fuel',
+        expenditure: 'Field visit fuel',
         paid_via: 'MPESA',
         mpesa_referral: '',
+        phone_number: '',
         project: '',
       }
     ]);
@@ -389,18 +395,20 @@ export default function ReportsImport() {
         date: '2026-01-10',
         amount: '5000',
         category: 'Supplies',
-        description: 'Stationery and printing',
+        expenditure: 'Stationery and printing',
         paid_via: 'MPESA',
         mpesa_referral: '',
+        phone_number: '0712345678',
         project: '',
       },
       {
         date: '2026-01-12',
         amount: '12000',
         category: 'Training',
-        description: 'Facilitator payment',
+        expenditure: 'Facilitator payment',
         paid_via: '',
         mpesa_referral: '',
+        phone_number: '',
         project: '',
       }
     ]);
@@ -550,7 +558,7 @@ export default function ReportsImport() {
               <w:rPr>
                 <w:sz w:val="20"/>
               </w:rPr>
-              <w:t>${escapeXml(r.description)}</w:t>
+              <w:t>${escapeXml(r.expenditure)}</w:t>
             </w:r>
           </w:p>
         </w:tc>
@@ -771,7 +779,7 @@ export default function ReportsImport() {
                   <w:sz w:val="20"/>
                   <w:color w:val="FFFFFF"/>
                 </w:rPr>
-                <w:t>Description</w:t>
+                <w:t>Expenditure</w:t>
               </w:r>
             </w:p>
           </w:tc>
@@ -1031,10 +1039,11 @@ export default function ReportsImport() {
       <tr>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.date)}</td>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.category)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.description)}</td>
+        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.expenditure)}</td>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: right; font-weight: 500; white-space: nowrap;">${escapeHtml(formatAmount(r.amount || 0, 'KES'))} KSH</td>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.paid_via)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; font-family: 'Courier New', monospace; text-align: center;">${escapeHtml(r.mpesa_code)}</td>
+        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; font-family: 'Courier New', monospace; text-align: center;">${escapeHtml(r.mpesa_reference)}</td>
+        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: center;">${escapeHtml(r.phone_number)}</td>
       </tr>
     `).join('');
 
@@ -1268,10 +1277,11 @@ export default function ReportsImport() {
             <tr>
               <th style="width: 12%;">Date</th>
               <th style="width: 15%;">Category</th>
-              <th style="width: 35%;">Description</th>
+              <th style="width: 35%;">Expenditure</th>
               <th style="width: 15%;">Amount</th>
               <th style="width: 13%;">Paid Via</th>
-              <th style="width: 10%;">M-Pesa Referral</th>
+              <th style="width: 10%;">M-Pesa Reference</th>
+              <th style="width: 15%;">Phone Number</th>
             </tr>
           </thead>
           <tbody>
@@ -1290,16 +1300,16 @@ export default function ReportsImport() {
   </body>
 </html>`;
 
-    // Create a blob and download directly
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `funder_report_${funderName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().slice(0, 10)}.html`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const w = window.open('', '_blank');
+    if (!w) {
+      alert('Unable to open print window — please allow popups.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => {
+      try { w.focus(); w.print(); } catch (e) { console.error(e); }
+    }, 500);
   };
 
   const onPickReportFile = async (file) => {
@@ -2095,7 +2105,7 @@ export default function ReportsImport() {
                 className="w-full text-sm text-slate-700 dark:text-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
                 onChange={(e) => onPickCSV(e.target.files && e.target.files[0])}
               />
-              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Required columns: date, amount. Optional: category, description, paid_via, mpesa_referral, project</div>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Required columns: date, amount. Optional: category, expenditure, paid_via, mpesa_referral, phone_number, project</div>
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Supported date formats: DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY</div>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <button onClick={downloadImportTemplate} className="text-xs font-medium text-slate-700 hover:underline dark:text-slate-200">Download template CSV</button>
