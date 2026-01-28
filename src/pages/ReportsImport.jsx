@@ -1925,7 +1925,7 @@ export default function ReportsImport() {
                   // Group by category for organized CSV
                   const groupedByCategory = {};
                   transactionsWithRefs.forEach(t => {
-                    const catKey = t.category || 'Uncategorized';
+                    const catKey = t.category || ''; // Keep empty if no category
                     if (!groupedByCategory[catKey]) {
                       groupedByCategory[catKey] = [];
                     }
@@ -1935,8 +1935,8 @@ export default function ReportsImport() {
                   // Create organized CSV with category groups
                   const organizedRows = [];
                   Object.keys(groupedByCategory).sort().forEach(category => {
-                    // Add category header only if category exists
-                    if (category && category !== 'Uncategorized') {
+                    // Add category header only if category exists and is not empty
+                    if (category && category.trim() !== '') {
                       organizedRows.push({
                         category: category,
                         payeeName: '',
@@ -1950,15 +1950,17 @@ export default function ReportsImport() {
                     groupedByCategory[category].forEach(t => {
                       organizedRows.push(t);
                     });
-                    // Add empty row for separation
-                    organizedRows.push({
-                      category: '',
-                      payeeName: '',
-                      description: '',
-                      amount: '',
-                      dateOfPayment: '',
-                      mpesaNumber: '',
-                    });
+                    // Add empty row for separation only if there was a category
+                    if (category && category.trim() !== '') {
+                      organizedRows.push({
+                        category: '',
+                        payeeName: '',
+                        description: '',
+                        amount: '',
+                        dateOfPayment: '',
+                        mpesaNumber: '',
+                      });
+                    }
                   });
                   
                   downloadCSV('transactions_filtered.csv', organizedRows);
