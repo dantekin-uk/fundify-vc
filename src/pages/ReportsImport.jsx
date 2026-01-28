@@ -1074,7 +1074,7 @@ export default function ReportsImport() {
         <section style="margin-top:18px;">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;">
             <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
-            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal))}</div>
+            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
           </div>
           ${payeesHtml}
         </section>
@@ -1112,7 +1112,7 @@ export default function ReportsImport() {
     <div class="card">
       <div style="font-weight:800;">Executive Summary</div>
       <div class="grid" style="margin-top:10px;">
-        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure))}</div></div>
+        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div></div>
         <div><div class="muted">Number of Categories</div><div style="font-weight:800;">${esc(execSummary.numberOfCategories)}</div></div>
         <div><div class="muted">Highest Spending Category</div><div style="font-weight:800;">${esc(execSummary.highestSpendingCategory)}</div></div>
         <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
@@ -1145,7 +1145,7 @@ export default function ReportsImport() {
     <div style="height:12px;"></div>
     <div class="card">
       <div style="font-weight:800;">Period Summary</div>
-      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure))}</div>
+      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div>
     </div>
   </div>
 </body>
@@ -1228,7 +1228,7 @@ export default function ReportsImport() {
         <section style="margin-top:18px;">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;">
             <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
-            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal))}</div>
+            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
           </div>
           ${payeesHtml}
         </section>
@@ -1266,7 +1266,7 @@ export default function ReportsImport() {
     <div class="card">
       <div style="font-weight:800;">Executive Summary</div>
       <div class="grid" style="margin-top:10px;">
-        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure))}</div></div>
+        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div></div>
         <div><div class="muted">Number of Categories</div><div style="font-weight:800;">${esc(execSummary.numberOfCategories)}</div></div>
         <div><div class="muted">Highest Spending Category</div><div style="font-weight:800;">${esc(execSummary.highestSpendingCategory)}</div></div>
         <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
@@ -1299,7 +1299,7 @@ export default function ReportsImport() {
     <div style="height:12px;"></div>
     <div class="card">
       <div style="font-weight:800;">Period Summary</div>
-      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure))}</div>
+      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div>
     </div>
   </div>
 </body>
@@ -1400,7 +1400,7 @@ export default function ReportsImport() {
       }).join('');
 
       return `
-        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal))})</w:t></w:r></w:p>
+        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal, 'KES'))} KSH)</w:t></w:r></w:p>
         ${payeesXml}
       `;
     }).join('');
@@ -1419,7 +1419,7 @@ export default function ReportsImport() {
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period: ${escapeXml(periodLabel)} | Date Generated: ${escapeXml(generatedDate)}</w:t></w:r></w:p>
 
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Executive Summary</w:t></w:r></w:p>
-      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0))}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))} KSH</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Number of Categories: ${escapeXml(execSummary.numberOfCategories || 0)}</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period Covered: ${escapeXml(periodLabel)}</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(narrative)}</w:t></w:r></w:p>
@@ -1448,7 +1448,7 @@ export default function ReportsImport() {
       </w:tbl>
 
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Period Summary</w:t></w:r></w:p>
-      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(periodLabel)} total: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0))}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(periodLabel)} total: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))} KSH</w:t></w:r></w:p>
     </w:sect>
   </w:body>
 </w:wordDocument>`;
