@@ -118,6 +118,46 @@ export default function ReportsImport() {
   const execSummary = useMemo(() => buildExecutiveSummary(periodTx), [periodTx]);
   const intelligence = useMemo(() => buildIntelligenceInsights(periodTx), [periodTx]);
 
+  const downloadExpenditureTemplate = () => {
+    downloadCSV('expenditure_template.csv', [
+      {
+        dateOfPayment: '2026-01-15',
+        category: 'Staff Costs',
+        payeeName: 'Jane Doe',
+        description: 'Project coordinator salary',
+        amount: '10000',
+        paymentMethod: 'MPESA',
+        referenceCode: '',
+        projectName: 'Project Alpha',
+      },
+    ]);
+  };
+
+  const downloadExpenditureExample = () => {
+    downloadCSV('expenditure_example.csv', [
+      {
+        dateOfPayment: '2026-01-05',
+        category: 'Travel & Transport',
+        payeeName: 'ABC Taxi Services',
+        description: 'Airport pickup for field team',
+        amount: '2500',
+        paymentMethod: 'MPESA',
+        referenceCode: 'QWE123ABC9',
+        projectName: 'Field Outreach',
+      },
+      {
+        dateOfPayment: '2026-01-10',
+        category: 'Operations',
+        payeeName: 'Office Supplies Ltd',
+        description: 'Stationery and printing',
+        amount: '7500',
+        paymentMethod: 'BANK TRANSFER',
+        referenceCode: '',
+        projectName: 'Head Office',
+      },
+    ]);
+  };
+
   const filteredExpenses = useMemo(() => {
     const fid = String(reportFunderId || '').trim();
     if (!fid) return [];
@@ -1739,6 +1779,14 @@ export default function ReportsImport() {
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Required columns: <span className="font-mono">dateOfPayment</span>, <span className="font-mono">category</span>, <span className="font-mono">payeeName</span>, <span className="font-mono">description</span>, <span className="font-mono">amount</span>.
                 Optional: <span className="font-mono">paymentMethod</span>, <span className="font-mono">referenceCode</span> (M-Pesa ref), <span className="font-mono">projectName</span>, <span className="font-mono">transactionId</span>.
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button onClick={downloadExpenditureTemplate} className="text-xs font-medium text-slate-700 hover:underline dark:text-slate-200">
+                  Download template (CSV for Excel)
+                </button>
+                <button onClick={downloadExpenditureExample} className="text-xs font-medium text-slate-700 hover:underline dark:text-slate-200">
+                  Download example file
+                </button>
               </div>
             </div>
 
