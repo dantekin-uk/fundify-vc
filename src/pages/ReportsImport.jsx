@@ -1693,14 +1693,14 @@ export default function ReportsImport() {
     // Regroup transactions with new references
     const groupedWithRefs = groupTransactionsCategoryPayee(transactionsWithRefs);
 
-    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}.`;
+    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
 
     const insights = (intelligence || []).slice(0, 8);
 
     const catSummaryRows = groupedWithRefs.map((c) => `
       <w:tr>
         <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName)}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(c.categoryTotal))}</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(c.categoryTotal, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
       </w:tr>
     `).join('');
 
@@ -1708,17 +1708,17 @@ export default function ReportsImport() {
       const payeesXml = c.payees.map((p) => {
         const txRows = p.transactions.map((t) => `
           <w:tr>
-            <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName)}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:r><w:t>${escapeXml(p.payeeName)}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount))}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(c.categoryName || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(p.payeeName || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>
           </w:tr>
         `).join('');
 
         return `
-          <w:p><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>Payee: ${escapeXml(p.payeeName)} (Subtotal: ${escapeXml(formatAmount(p.subtotal))})</w:t></w:r></w:p>
+          <w:p><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>Payee: ${escapeXml(p.payeeName)} (Subtotal: ${escapeXml(formatAmount(p.subtotal, 'KES'))} KSH)</w:t></w:r></w:p>
           <w:tbl>
             <w:tblPr>
               <w:tblW w:w="0" w:type="auto"/>
@@ -1913,36 +1913,39 @@ export default function ReportsImport() {
                       usedRefs.add(refCode);
                     }
                     return {
-                      category: t.category || '',
-                      payeeName: t.payeeName || '',
-                      description: t.description || '',
+                      category: t.category || '', // Keep empty if no category
+                      payeeName: t.payeeName || '', // Keep empty if no payee
+                      description: t.description || '', // Keep empty if no description
                       amount: t.amount || 0,
                       dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
-                      referenceCode: refCode,
+                      mpesaNumber: refCode || '', // M-Pesa number column
                     };
                   });
                   
                   // Group by category for organized CSV
                   const groupedByCategory = {};
                   transactionsWithRefs.forEach(t => {
-                    if (!groupedByCategory[t.category]) {
-                      groupedByCategory[t.category] = [];
+                    const catKey = t.category || 'Uncategorized';
+                    if (!groupedByCategory[catKey]) {
+                      groupedByCategory[catKey] = [];
                     }
-                    groupedByCategory[t.category].push(t);
+                    groupedByCategory[catKey].push(t);
                   });
                   
                   // Create organized CSV with category groups
                   const organizedRows = [];
                   Object.keys(groupedByCategory).sort().forEach(category => {
-                    // Add category header
-                    organizedRows.push({
-                      category: category,
-                      payeeName: '',
-                      description: '',
-                      amount: '',
-                      dateOfPayment: '',
-                      referenceCode: '',
-                    });
+                    // Add category header only if category exists
+                    if (category && category !== 'Uncategorized') {
+                      organizedRows.push({
+                        category: category,
+                        payeeName: '',
+                        description: '',
+                        amount: '',
+                        dateOfPayment: '',
+                        mpesaNumber: '',
+                      });
+                    }
                     // Add transactions for this category
                     groupedByCategory[category].forEach(t => {
                       organizedRows.push(t);
@@ -1954,7 +1957,7 @@ export default function ReportsImport() {
                       description: '',
                       amount: '',
                       dateOfPayment: '',
-                      referenceCode: '',
+                      mpesaNumber: '',
                     });
                   });
                   
@@ -1990,29 +1993,11 @@ export default function ReportsImport() {
           )}
 
           {periodTx.length > 0 && (
-            <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="mt-5">
               <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-500 dark:text-slate-400">Total expenditure</div>
-                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-500 dark:text-slate-400">Highest spending category</div>
-                  <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">{execSummary.highestSpendingCategory || '-'}</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{formatAmount(execSummary.highestSpendingCategoryTotal || 0, 'KES')} KSH</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-gray-500 dark:text-slate-400">Intelligence insights</div>
-                  <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                    {(intelligence || []).slice(0, 4).map((it, idx) => (
-                      <li key={idx} className={it.type === 'warning' ? 'text-amber-700 dark:text-amber-200' : ''}>- {it.text}</li>
-                    ))}
-                    {intelligence.length === 0 && (<li className="text-slate-500 dark:text-slate-400">- No insights yet.</li>)}
-                  </ul>
+                <CardContent className="p-6">
+                  <div className="text-sm text-gray-500 dark:text-slate-400 mb-2">Total expenditure</div>
+                  <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">{formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH</div>
                 </CardContent>
               </Card>
             </div>
@@ -2021,29 +2006,29 @@ export default function ReportsImport() {
           {reportPreview.length > 0 && (
             <div className="mt-4">
               <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Preview (first 25 rows after period filter)</div>
-              <div className="mt-3 overflow-x-auto ring-1 ring-slate-200 dark:ring-slate-700 rounded-lg">
-                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50">
+              <div className="mt-3 overflow-x-auto ring-1 ring-slate-200 dark:ring-slate-700 rounded-lg shadow-sm">
+                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                  <thead className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Date</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Category</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Payee</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Description</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100">Amount</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Method</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">M-Pesa Ref</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Category</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Payee</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Description</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Method</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">M-Pesa Ref</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
                     {reportPreview.map((r, idx) => (
-                      <tr key={idx}>
-                        <td className="px-3 py-2 whitespace-nowrap text-slate-900 dark:text-slate-100">{r.dateOfPayment}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.category}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.payeeName}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.description}</td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0, 'KES')} KSH</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.paymentMethod}</td>
-                        <td className="px-3 py-2 font-mono text-slate-900 dark:text-slate-100">{r.referenceCode}</td>
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">{r.dateOfPayment}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{r.category}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{r.payeeName}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{r.description}</td>
+                        <td className="px-4 py-3 text-sm text-right whitespace-nowrap font-medium text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0, 'KES')} KSH</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{r.paymentMethod}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-slate-900 dark:text-slate-100">{r.referenceCode}</td>
                       </tr>
                     ))}
                   </tbody>
