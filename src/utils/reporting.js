@@ -212,6 +212,20 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     for (const c of candidates) {
       if (r && Object.prototype.hasOwnProperty.call(r, c)) return r[c];
     }
+    // Fallback: fuzzy match by normalized header containing the candidate token
+    if (r) {
+      const entries = Object.entries(r);
+      for (const [rawKey, value] of entries) {
+        const normKey = normalizeHeader(rawKey);
+        for (const c of candidates) {
+          const token = normalizeHeader(c);
+          if (!token) continue;
+          if (normKey === token || normKey.includes(token)) {
+            return value;
+          }
+        }
+      }
+    }
     return undefined;
   };
 

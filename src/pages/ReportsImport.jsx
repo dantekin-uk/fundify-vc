@@ -1273,6 +1273,16 @@ export default function ReportsImport() {
       </tr>
     `).join('');
 
+    const narrative = (() => {
+      const topCat = execSummary.highestSpendingCategory || '-';
+      const topCatAmt = execSummary.highestSpendingCategoryTotal || 0;
+      return `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}. Highest spending category is ${topCat} (${formatAmount(topCatAmt)}).`;
+    })();
+
+    const insightsHtml = (intelligence || []).slice(0, 6).map((it) => `
+      <li style="margin:4px 0; color:${it.type === 'warning' ? '#b45309' : '#334155'};">${esc(it.text)}</li>
+    `).join('');
+
     const body = grouped.map((c) => {
       const payeesHtml = c.payees.map((p) => {
         const txRows = p.transactions.map((t) => `
@@ -1280,6 +1290,8 @@ export default function ReportsImport() {
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount))}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
           </tr>
         `).join('');
         return `
@@ -1294,6 +1306,8 @@ export default function ReportsImport() {
                   <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Date</th>
                   <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Description</th>
                   <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Amount</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Method</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
                 </tr>
               </thead>
               <tbody>
@@ -1350,6 +1364,15 @@ export default function ReportsImport() {
         <div><div class="muted">Highest Spending Category</div><div style="font-weight:800;">${esc(execSummary.highestSpendingCategory)}</div></div>
         <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
       </div>
+      <div class="muted" style="margin-top:10px;">${esc(narrative)}</div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Intelligence Insights</div>
+      <ul style="margin:8px 0 0 18px;padding:0;">
+        ${insightsHtml || '<li class="muted">No insights detected.</li>'}
+      </ul>
     </div>
 
     <div style="height:12px;"></div>
@@ -1384,6 +1407,309 @@ export default function ReportsImport() {
 </html>`;
 
     downloadText(`NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.html`, html, 'text/html;charset=utf-8');
+  };
+
+  const exportHierarchyPDF = () => {
+    if (!periodTx.length) return;
+    // "PDF export" via print dialog (Save as PDF)
+    // This matches your existing pattern elsewhere and is reliable for long tables.
+    const generated = new Date().toLocaleString();
+    const title = reportType === 'monthly'
+      ? 'Monthly Expenditure Report'
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : 'Annual Expenditure Report');
+    const filename = `NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.pdf`;
+
+    // Reuse the same HTML but open it in a new window for printing
+    // (we keep it in-memory so it works without server-side rendering).
+    const htmlBlob = new Blob([], { type: 'text/html;charset=utf-8' });
+    void htmlBlob; // keeps linter happy; we build html by calling exportHierarchyHTML logic inline
+
+    // Build HTML by calling exportHierarchyHTML's internal builder (copy minimal parts)
+    // We simply call exportHierarchyHTML to download HTML AND then print the same doc.
+    // To avoid double-building, we build again here (fast enough for typical sizes).
+    const esc = (v) => String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}. Highest spending category is ${escSummarySafe(execSummary.highestSpendingCategory)} (${formatAmount(execSummary.highestSpendingCategoryTotal || 0)}).`;
+    function escSummarySafe(x) { return x == null ? '-' : String(x); }
+
+    const catSummaryRows = grouped.map((c) => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${esc(c.categoryName)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal))}</td>
+      </tr>
+    `).join('');
+    const insightsHtml = (intelligence || []).slice(0, 6).map((it) => `
+      <li style="margin:4px 0; color:${it.type === 'warning' ? '#b45309' : '#334155'};">${esc(it.text)}</li>
+    `).join('');
+    const body = grouped.map((c) => {
+      const payeesHtml = c.payees.map((p) => {
+        const txRows = p.transactions.map((t) => `
+          <tr>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount))}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
+          </tr>
+        `).join('');
+        return `
+          <div style="margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;">
+              <div style="font-weight:700;">Payee: ${esc(p.payeeName)}</div>
+              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal))}</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Date</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Description</th>
+                  <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Amount</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Method</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${txRows}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join('');
+      return `
+        <section style="margin-top:18px;">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;">
+            <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
+            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal))}</div>
+          </div>
+          ${payeesHtml}
+        </section>
+      `;
+    }).join('');
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(title)} - ${esc(periodLabel)}</title>
+  <style>
+    @page { size: A4; margin: 16mm; }
+    body { font-family: Segoe UI, Arial, sans-serif; color:#0f172a; margin:0; background:#fff; }
+    .container { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .muted { color:#64748b; font-size: 13px; }
+    .card { border:1px solid #e5e7eb; border-radius: 12px; padding: 14px; background:#fff; }
+    .grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    @media print { .container { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+        <div>
+          <div style="font-weight:900;font-size:18px;">Organization Name: NAPTA</div>
+          <div style="font-weight:800;font-size:16px;margin-top:4px;">${esc(title)}</div>
+          <div class="muted" style="margin-top:4px;">Reporting Period: ${esc(periodLabel)}</div>
+        </div>
+        <div class="muted">Date Generated: ${esc(generated)}</div>
+      </div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Executive Summary</div>
+      <div class="grid" style="margin-top:10px;">
+        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure))}</div></div>
+        <div><div class="muted">Number of Categories</div><div style="font-weight:800;">${esc(execSummary.numberOfCategories)}</div></div>
+        <div><div class="muted">Highest Spending Category</div><div style="font-weight:800;">${esc(execSummary.highestSpendingCategory)}</div></div>
+        <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
+      </div>
+      <div class="muted" style="margin-top:10px;">${esc(narrative)}</div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Intelligence Insights</div>
+      <ul style="margin:8px 0 0 18px;padding:0;">
+        ${insightsHtml || '<li class="muted">No insights detected.</li>'}
+      </ul>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Category Breakdown</div>
+      ${body || '<div class="muted" style="margin-top:8px;">No transactions for this period.</div>'}
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Category Summary Table</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Category</th>
+            <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Total Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${catSummaryRows || ''}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Period Summary</div>
+      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure))}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.document.title = filename;
+    // Give the browser a moment to render before printing
+    setTimeout(() => {
+      try { w.focus(); w.print(); } catch {}
+    }, 400);
+  };
+
+  const exportHierarchyWord = () => {
+    if (!periodTx.length) return;
+    const generatedDate = new Date().toLocaleString();
+    const title = reportType === 'monthly'
+      ? 'Monthly Expenditure Report'
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : 'Annual Expenditure Report');
+
+    const escapeXml = (v) => String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}. Highest spending category is ${execSummary.highestSpendingCategory || '-'} (${formatAmount(execSummary.highestSpendingCategoryTotal || 0)}).`;
+
+    const insights = (intelligence || []).slice(0, 8);
+
+    const catSummaryRows = grouped.map((c) => `
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName)}</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(c.categoryTotal))}</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    `).join('');
+
+    const breakdownXml = grouped.map((c) => {
+      const payeesXml = c.payees.map((p) => {
+        const txRows = p.transactions.map((t) => `
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>${escapeXml(t.description)}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount))}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>${escapeXml(t.paymentMethod || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>
+          </w:tr>
+        `).join('');
+
+        return `
+          <w:p><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>Payee: ${escapeXml(p.payeeName)} (Subtotal: ${escapeXml(formatAmount(p.subtotal))})</w:t></w:r></w:p>
+          <w:tbl>
+            <w:tblPr>
+              <w:tblW w:w="0" w:type="auto"/>
+              <w:tblBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+                <w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+                <w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+              </w:tblBorders>
+            </w:tblPr>
+            <w:tr>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Date</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Description</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Method</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Ref</w:t></w:r></w:p></w:tc>
+            </w:tr>
+            ${txRows}
+          </w:tbl>
+        `;
+      }).join('');
+
+      return `
+        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal))})</w:t></w:r></w:p>
+        ${payeesXml}
+      `;
+    }).join('');
+
+    const insightsXml = insights.map((it) => `
+      <w:p><w:r><w:t>- ${escapeXml(it.text)}</w:t></w:r></w:p>
+    `).join('');
+
+    const wordXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?mso-application progid="Word.Document"?>
+<w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml">
+  <w:body>
+    <w:sect>
+      <w:p><w:r><w:rPr><w:b/><w:sz w:val="30"/></w:rPr><w:t>Organization Name: NAPTA</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${escapeXml(title)}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period: ${escapeXml(periodLabel)} | Date Generated: ${escapeXml(generatedDate)}</w:t></w:r></w:p>
+
+      <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Executive Summary</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0))}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Number of Categories: ${escapeXml(execSummary.numberOfCategories || 0)}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Highest Spending Category: ${escapeXml(execSummary.highestSpendingCategory || '-')}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period Covered: ${escapeXml(periodLabel)}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(narrative)}</w:t></w:r></w:p>
+
+      <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Intelligence Insights</w:t></w:r></w:p>
+      ${insightsXml || '<w:p><w:r><w:t>- No insights detected.</w:t></w:r></w:p>'}
+
+      <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Category Breakdown</w:t></w:r></w:p>
+      ${breakdownXml || '<w:p><w:r><w:t>No transactions for this period.</w:t></w:r></w:p>'}
+
+      <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Category Summary Table</w:t></w:r></w:p>
+      <w:tbl>
+        <w:tblPr>
+          <w:tblW w:w="0" w:type="auto"/>
+          <w:tblBorders>
+            <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+            <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+            <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+            <w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+            <w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+          </w:tblBorders>
+        </w:tblPr>
+        <w:tr>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Category</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Total Amount</w:t></w:r></w:p></w:tc>
+        </w:tr>
+        ${catSummaryRows}
+      </w:tbl>
+
+      <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Period Summary</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(periodLabel)} total: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0))}</w:t></w:r></w:p>
+    </w:sect>
+  </w:body>
+</w:wordDocument>`;
+
+    const blob = new Blob([wordXml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.doc`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -1453,6 +1779,20 @@ export default function ReportsImport() {
                 className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm disabled:opacity-50 dark:bg-sky-500"
               >
                 Export Report (HTML)
+              </button>
+              <button
+                onClick={exportHierarchyPDF}
+                disabled={periodTx.length === 0}
+                className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+              >
+                Export PDF
+              </button>
+              <button
+                onClick={exportHierarchyWord}
+                disabled={periodTx.length === 0}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50 dark:bg-indigo-500"
+              >
+                Export Word
               </button>
               <button
                 onClick={() => downloadCSV('transactions_filtered.csv', periodTx.map((t) => ({
