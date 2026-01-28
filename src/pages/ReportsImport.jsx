@@ -3,6 +3,16 @@ import { useFinance } from '../context/FinanceContext';
 import { useOrg } from '../context/OrgContext';
 import { formatAmount } from '../utils/format';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import {
+  buildExecutiveSummary,
+  buildIntelligenceInsights,
+  deriveReportingPeriod,
+  filterByPeriod,
+  genReferenceCode,
+  groupTransactionsCategoryPayee,
+  normalizeImportedRowsToTransactions,
+  readSpreadsheetFile,
+} from '../utils/reporting';
 
 function toCSV(rows) {
   if (!rows.length) return '';
@@ -25,72 +35,16 @@ function downloadCSV(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-function parseCSV(text) {
-  const out = [];
-  let row = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        cur += ch;
-      }
-      continue;
-    }
-    if (ch === '"') {
-      inQuotes = true;
-      continue;
-    }
-    if (ch === ',') {
-      row.push(cur);
-      cur = '';
-      continue;
-    }
-    if (ch === '\n') {
-      row.push(cur);
-      cur = '';
-      const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
-      if (!isEmpty) out.push(row);
-      row = [];
-      continue;
-    }
-    if (ch === '\r') continue;
-    cur += ch;
-  }
-  row.push(cur);
-  const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
-  if (!isEmpty) out.push(row);
-  return out;
-}
-
-function normalizeHeader(s) {
-  return String(s || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_]/g, '');
-}
-
-function genMpesaCode(existing) {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const digits = '0123456789';
-  const chars = alphabet + digits;
-  for (let attempt = 0; attempt < 50; attempt++) {
-    let code = '';
-    for (let i = 0; i < 10; i++) code += chars[Math.floor(Math.random() * chars.length)];
-    if (!existing || !existing.has(code)) return code;
-  }
-  let fallback = 'MP' + Date.now().toString(36).toUpperCase().slice(-8);
-  fallback = fallback.replace(/[^A-Z0-9]/g, 'X').slice(0, 10).padEnd(10, 'X');
-  return fallback;
+function downloadText(filename, text, mime = 'text/plain;charset=utf-8') {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export default function ReportsImport() {
@@ -107,6 +61,16 @@ export default function ReportsImport() {
   const [importStats, setImportStats] = useState({ total: 0, accepted: 0, ignored: 0 });
   const [importSuccess, setImportSuccess] = useState(0);
 
+  // New: Report generator (NAPTA hierarchy reports)
+  const [reportFileRows, setReportFileRows] = useState([]);
+  const [reportTx, setReportTx] = useState([]);
+  const [reportErrors, setReportErrors] = useState([]);
+  const [reportWarnings, setReportWarnings] = useState([]);
+  const [reportType, setReportType] = useState('monthly'); // monthly | quarterly | yearly
+  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [reportQuarter, setReportQuarter] = useState(() => String(Math.floor(new Date().getMonth() / 3) + 1));
+  const [reportYear, setReportYear] = useState(() => String(new Date().getFullYear()));
+
   const [reportFunderId, setReportFunderId] = useState('');
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
@@ -121,6 +85,38 @@ export default function ReportsImport() {
       description: r.description || '',
     }));
   }, [importRows]);
+
+  const selectedPeriod = useMemo(() => {
+    if (reportType === 'monthly') {
+      const [yy, mm] = String(reportMonth || '').split('-');
+      return { type: 'monthly', year: Number(yy), month: Number(mm) };
+    }
+    if (reportType === 'quarterly') {
+      return { type: 'quarterly', year: Number(reportYear), quarter: Number(reportQuarter) };
+    }
+    return { type: 'yearly', year: Number(reportYear) };
+  }, [reportType, reportMonth, reportQuarter, reportYear]);
+
+  const periodLabel = useMemo(() => {
+    if (reportType === 'monthly') {
+      const [yy, mm] = String(reportMonth || '').split('-');
+      if (!yy || !mm) return '';
+      const date = new Date(Number(yy), Number(mm) - 1, 1);
+      return date.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+    }
+    if (reportType === 'quarterly') return `Q${reportQuarter} ${reportYear}`;
+    return String(reportYear || '');
+  }, [reportType, reportMonth, reportQuarter, reportYear]);
+
+  const periodTx = useMemo(() => {
+    const filtered = filterByPeriod(reportTx || [], selectedPeriod);
+    // derive reportingPeriod field
+    return filtered.map((t) => ({ ...t, reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
+  }, [reportTx, selectedPeriod, reportType]);
+
+  const grouped = useMemo(() => groupTransactionsCategoryPayee(periodTx), [periodTx]);
+  const execSummary = useMemo(() => buildExecutiveSummary(periodTx), [periodTx]);
+  const intelligence = useMemo(() => buildIntelligenceInsights(periodTx), [periodTx]);
 
   const filteredExpenses = useMemo(() => {
     const fid = String(reportFunderId || '').trim();
@@ -161,11 +157,43 @@ export default function ReportsImport() {
     if (!file) return;
     try {
       const text = await file.text();
-      const grid = parseCSV(text);
+      const grid = (() => {
+        // keep legacy import parser local to this feature
+        // NOTE: this legacy importer expects a CSV with a header row
+        const out = [];
+        let row = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (text[i + 1] === '"') { cur += '"'; i++; } else { inQuotes = false; }
+            } else cur += ch;
+            continue;
+          }
+          if (ch === '"') { inQuotes = true; continue; }
+          if (ch === ',') { row.push(cur); cur = ''; continue; }
+          if (ch === '\n') {
+            row.push(cur); cur = '';
+            const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
+            if (!isEmpty) out.push(row);
+            row = [];
+            continue;
+          }
+          if (ch === '\r') continue;
+          cur += ch;
+        }
+        row.push(cur);
+        const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
+        if (!isEmpty) out.push(row);
+        return out;
+      })();
       if (!grid.length) {
         setImportErrors(['CSV is empty']);
         return;
       }
+      const normalizeHeader = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
       const headers = (grid[0] || []).map(normalizeHeader);
       if (!headers.length || headers.every((h) => !h)) {
         setImportErrors(['CSV header row is missing or invalid']);
@@ -252,7 +280,7 @@ export default function ReportsImport() {
         if (!paidVia) paidVia = 'MPESA';
         if (String(paidVia).toUpperCase() !== 'MPESA') continue;
         if (e.mpesaCode && String(e.mpesaCode).trim()) continue;
-        const code = genMpesaCode(used);
+        const code = genReferenceCode(used);
         used.add(code);
         const res = await updateExpense(e.id, { paidVia: 'MPESA', mpesaCode: code });
         if (res?.success) count++;
@@ -320,7 +348,7 @@ export default function ReportsImport() {
         const paidVia = (r.paidVia || 'MPESA').toString().trim() || 'MPESA';
         const isMpesa = paidVia.toUpperCase() === 'MPESA';
         const mpesaCode = isMpesa
-          ? (r.mpesaCode || genMpesaCode(used))
+          ? (r.mpesaCode || genReferenceCode(used))
           : null;
         if (isMpesa && mpesaCode) used.add(mpesaCode);
 
@@ -1192,14 +1220,399 @@ export default function ReportsImport() {
     URL.revokeObjectURL(url);
   };
 
+  const onPickReportFile = async (file) => {
+    setReportErrors([]);
+    setReportWarnings([]);
+    setReportFileRows([]);
+    setReportTx([]);
+    if (!file) return;
+    const res = await readSpreadsheetFile(file);
+    if (res.error) {
+      setReportErrors([res.error]);
+      return;
+    }
+    const rows = Array.isArray(res.rows) ? res.rows : [];
+    setReportFileRows(rows);
+    const normalized = normalizeImportedRowsToTransactions(rows, { defaultPaymentMethod: 'MPESA' });
+    setReportErrors(normalized.errors || []);
+    setReportWarnings(normalized.warnings || []);
+    setReportTx(normalized.transactions || []);
+  };
+
+  const reportPreview = useMemo(() => {
+    return (periodTx || []).slice(0, 25).map((t) => ({
+      transactionId: t.transactionId,
+      dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
+      category: t.category,
+      payeeName: t.payeeName,
+      description: t.description,
+      amount: t.amount,
+      paymentMethod: t.paymentMethod || '',
+      referenceCode: t.referenceCode || '',
+      projectName: t.projectName || '',
+    }));
+  }, [periodTx]);
+
+  const exportHierarchyHTML = () => {
+    const generated = new Date().toLocaleString();
+    const title = reportType === 'monthly'
+      ? 'Monthly Expenditure Report'
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : 'Annual Expenditure Report');
+
+    const esc = (v) => String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    const catSummaryRows = grouped.map((c) => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${esc(c.categoryName)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal))}</td>
+      </tr>
+    `).join('');
+
+    const body = grouped.map((c) => {
+      const payeesHtml = c.payees.map((p) => {
+        const txRows = p.transactions.map((t) => `
+          <tr>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount))}</td>
+          </tr>
+        `).join('');
+        return `
+          <div style="margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;">
+              <div style="font-weight:700;">Payee: ${esc(p.payeeName)}</div>
+              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal))}</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Date</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Description</th>
+                  <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${txRows}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join('');
+      return `
+        <section style="margin-top:18px;">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;">
+            <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
+            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal))}</div>
+          </div>
+          ${payeesHtml}
+        </section>
+      `;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title} - ${esc(periodLabel)}</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; color:#0f172a; margin:0; background:#fff; }
+    .container { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .muted { color:#64748b; font-size: 13px; }
+    .card { border:1px solid #e5e7eb; border-radius: 12px; padding: 14px; background:#fff; }
+    .grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    @media print { .no-print { display:none; } .container { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+        <div>
+          <div style="font-weight:900;font-size:18px;">Organization Name: NAPTA</div>
+          <div style="font-weight:800;font-size:16px;margin-top:4px;">${esc(title)}</div>
+          <div class="muted" style="margin-top:4px;">Reporting Period: ${esc(periodLabel)}</div>
+        </div>
+        <div class="muted">Date Generated: ${esc(generated)}</div>
+      </div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Executive Summary</div>
+      <div class="grid" style="margin-top:10px;">
+        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure))}</div></div>
+        <div><div class="muted">Number of Categories</div><div style="font-weight:800;">${esc(execSummary.numberOfCategories)}</div></div>
+        <div><div class="muted">Highest Spending Category</div><div style="font-weight:800;">${esc(execSummary.highestSpendingCategory)}</div></div>
+        <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
+      </div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Category Breakdown</div>
+      ${body || '<div class="muted" style="margin-top:8px;">No transactions for this period.</div>'}
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Category Summary Table</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Category</th>
+            <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Total Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${catSummaryRows || ''}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="card">
+      <div style="font-weight:800;">Period Summary</div>
+      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure))}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    downloadText(`NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.html`, html, 'text/html;charset=utf-8');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-slate-100 sm:truncate sm:text-3xl sm:tracking-tight">CSV Import & Funder Report</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Import expenses for a funder and generate a downloadable transaction report with M-Pesa referrals.</p>
+          <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-slate-100 sm:truncate sm:text-3xl sm:tracking-tight">Report Generator</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Import CSV/Excel and generate Monthly, Quarterly (Q1-Q4), or Yearly reports using the hierarchy: Category → Payee → Individual Transactions.</p>
         </div>
       </div>
+
+      {/* NEW: NAPTA hierarchy report generator */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Generate expenditure report (NAPTA format)</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Upload CSV / Excel</label>
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                className="w-full text-sm text-slate-700 dark:text-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
+                onChange={(e) => onPickReportFile(e.target.files && e.target.files[0])}
+              />
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Required columns: <span className="font-mono">dateOfPayment</span>, <span className="font-mono">category</span>, <span className="font-mono">payeeName</span>, <span className="font-mono">description</span>, <span className="font-mono">amount</span>.
+                Optional: <span className="font-mono">paymentMethod</span>, <span className="font-mono">referenceCode</span> (M-Pesa ref), <span className="font-mono">projectName</span>, <span className="font-mono">transactionId</span>.
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Report type</label>
+              <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none">
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Period</label>
+              {reportType === 'monthly' && (
+                <input type="month" value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" />
+              )}
+              {reportType === 'quarterly' && (
+                <div className="flex items-center gap-2">
+                  <select value={reportQuarter} onChange={(e) => setReportQuarter(e.target.value)} className="w-24 px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none">
+                    <option value="1">Q1</option>
+                    <option value="2">Q2</option>
+                    <option value="3">Q3</option>
+                    <option value="4">Q4</option>
+                  </select>
+                  <input type="number" value={reportYear} onChange={(e) => setReportYear(e.target.value)} className="flex-1 px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" />
+                </div>
+              )}
+              {reportType === 'yearly' && (
+                <input type="number" value={reportYear} onChange={(e) => setReportYear(e.target.value)} className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" />
+              )}
+            </div>
+
+            <div className="md:col-span-5 flex flex-wrap items-center gap-3">
+              <button
+                onClick={exportHierarchyHTML}
+                disabled={periodTx.length === 0}
+                className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm disabled:opacity-50 dark:bg-sky-500"
+              >
+                Export Report (HTML)
+              </button>
+              <button
+                onClick={() => downloadCSV('transactions_filtered.csv', periodTx.map((t) => ({
+                  transactionId: t.transactionId,
+                  dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toISOString() : '',
+                  category: t.category,
+                  payeeName: t.payeeName,
+                  description: t.description,
+                  amount: t.amount,
+                  paymentMethod: t.paymentMethod || '',
+                  referenceCode: t.referenceCode || '',
+                  projectName: t.projectName || '',
+                  reportingPeriod: t.reportingPeriod || '',
+                })))}
+                disabled={periodTx.length === 0}
+                className="text-sm font-medium text-slate-700 hover:underline disabled:opacity-50 dark:text-slate-200"
+              >
+                Export Filtered CSV
+              </button>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Loaded: {reportTx.length} tx • Period: {periodLabel || '-'} • Showing: {periodTx.length}
+              </div>
+            </div>
+          </div>
+
+          {reportErrors.length > 0 && (
+            <div className="mt-4 rounded-lg bg-rose-50 dark:bg-rose-950/40 ring-1 ring-rose-200 dark:ring-rose-900/40 p-3">
+              <div className="text-sm font-medium text-rose-700 dark:text-rose-200">Import issues</div>
+              <ul className="mt-1 text-sm text-rose-700 dark:text-rose-200 list-disc pl-5">
+                {reportErrors.map((e, idx) => (<li key={idx}>{e}</li>))}
+              </ul>
+            </div>
+          )}
+
+          {reportWarnings.length > 0 && (
+            <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 ring-1 ring-amber-200 dark:ring-amber-900/40 p-3">
+              <div className="text-sm font-medium text-amber-800 dark:text-amber-200">Warnings</div>
+              <ul className="mt-1 text-sm text-amber-800 dark:text-amber-200 list-disc pl-5">
+                {reportWarnings.map((e, idx) => (<li key={idx}>{e}</li>))}
+              </ul>
+            </div>
+          )}
+
+          {periodTx.length > 0 && (
+            <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Total expenditure</div>
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{formatAmount(execSummary.totalExpenditure || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Highest spending category</div>
+                  <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">{execSummary.highestSpendingCategory || '-'}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">{formatAmount(execSummary.highestSpendingCategoryTotal || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Intelligence insights</div>
+                  <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                    {(intelligence || []).slice(0, 4).map((it, idx) => (
+                      <li key={idx} className={it.type === 'warning' ? 'text-amber-700 dark:text-amber-200' : ''}>- {it.text}</li>
+                    ))}
+                    {intelligence.length === 0 && (<li className="text-slate-500 dark:text-slate-400">- No insights yet.</li>)}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {reportPreview.length > 0 && (
+            <div className="mt-4">
+              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Preview (first 25 rows after period filter)</div>
+              <div className="mt-3 overflow-x-auto ring-1 ring-slate-200 dark:ring-slate-700 rounded-lg">
+                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Date</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Category</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Payee</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Description</th>
+                      <th className="px-3 py-2 text-right font-semibold text-slate-900 dark:text-slate-100">Amount</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">Method</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-900 dark:text-slate-100">M-Pesa Ref</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {reportPreview.map((r, idx) => (
+                      <tr key={idx}>
+                        <td className="px-3 py-2 whitespace-nowrap text-slate-900 dark:text-slate-100">{r.dateOfPayment}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.category}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.payeeName}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.description}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0, orgCurrency || null)} {orgCurrency || ''}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.paymentMethod}</td>
+                        <td className="px-3 py-2 font-mono text-slate-900 dark:text-slate-100">{r.referenceCode}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Optional: show the hierarchy in-app (collapsible style, not too heavy) */}
+          {grouped.length > 0 && (
+            <div className="mt-5">
+              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Generated structure (Category → Payee → Transactions)</div>
+              <div className="mt-3 space-y-3">
+                {grouped.slice(0, 12).map((c) => (
+                  <div key={c.categoryName} className="rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{c.categoryName}</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatAmount(c.categoryTotal || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {c.payees.slice(0, 6).map((p) => (
+                        <div key={p.payeeName} className="rounded-md bg-slate-50 dark:bg-slate-800/40 p-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{p.payeeName}</div>
+                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatAmount(p.subtotal || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                          </div>
+                          <div className="mt-2 overflow-x-auto">
+                            <table className="min-w-full text-xs">
+                              <thead>
+                                <tr className="text-slate-500 dark:text-slate-400">
+                                  <th className="text-left py-1 pr-3">Date</th>
+                                  <th className="text-left py-1 pr-3">Description</th>
+                                  <th className="text-right py-1">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody className="text-slate-800 dark:text-slate-200">
+                                {p.transactions.slice(0, 5).map((t) => (
+                                  <tr key={t.transactionId}>
+                                    <td className="py-1 pr-3 whitespace-nowrap">{t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : ''}</td>
+                                    <td className="py-1 pr-3">{t.description}</td>
+                                    <td className="py-1 text-right whitespace-nowrap">{formatAmount(t.amount || 0, orgCurrency || null)} {orgCurrency || ''}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
+                      {(c.payees.length > 6) && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400">Showing top 6 payees (by subtotal) for performance.</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {(grouped.length > 12) && (
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Showing top 12 categories (by total) for performance. Export HTML to get the full report.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
