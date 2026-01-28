@@ -271,7 +271,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
 
     if (!date || isNaN(date.getTime())) { ignored++; continue; }
     if (!Number.isFinite(amount) || amount <= 0) { ignored++; continue; }
-    if (!category) category = 'Uncategorized';
+    // Keep category empty if not provided
     if (!payeeName) payeeName = 'Unknown';
 
     const isMpesa = paymentMethod.toUpperCase() === 'MPESA' || paymentMethod.toUpperCase() === 'M-PESA';
@@ -311,7 +311,7 @@ export function groupTransactionsCategoryPayee(transactions) {
   const byCategory = new Map();
 
   for (const t of safeTx) {
-    const cat = String(t.category || 'Uncategorized').trim() || 'Uncategorized';
+    const cat = String(t.category || '').trim(); // Keep empty if no category
     const payee = String(t.payeeName || 'Unknown').trim() || 'Unknown';
 
     if (!byCategory.has(cat)) byCategory.set(cat, new Map());
@@ -339,7 +339,7 @@ export function buildExecutiveSummary(transactions) {
   const total = txs.reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const catTotals = new Map();
   for (const t of txs) {
-    const cat = String(t.category || 'Uncategorized').trim() || 'Uncategorized';
+    const cat = String(t.category || '').trim(); // Keep empty if no category
     catTotals.set(cat, (catTotals.get(cat) || 0) + (Number(t.amount) || 0));
   }
   let topCategory = null;

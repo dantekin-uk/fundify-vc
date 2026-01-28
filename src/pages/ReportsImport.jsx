@@ -1915,10 +1915,10 @@ export default function ReportsImport() {
                     return {
                       category: t.category || '', // Keep empty if no category
                       payeeName: t.payeeName || '', // Keep empty if no payee
-                      description: t.description || '', // Keep empty if no description
+                      expenditure: t.description || '', // Expenditure column (description)
                       amount: t.amount || 0,
                       dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
-                      mpesaNumber: refCode || '', // M-Pesa number column
+                      mpesaNumber: t.referenceCode || '', // M-Pesa number (existing reference code)
                     };
                   });
                   
@@ -1940,7 +1940,7 @@ export default function ReportsImport() {
                       organizedRows.push({
                         category: category,
                         payeeName: '',
-                        description: '',
+                        expenditure: '',
                         amount: '',
                         dateOfPayment: '',
                         mpesaNumber: '',
@@ -1955,7 +1955,7 @@ export default function ReportsImport() {
                       organizedRows.push({
                         category: '',
                         payeeName: '',
-                        description: '',
+                        expenditure: '',
                         amount: '',
                         dateOfPayment: '',
                         mpesaNumber: '',
