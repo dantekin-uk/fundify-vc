@@ -1676,18 +1676,35 @@ export default function ReportsImport() {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
+    // Generate automatic M-Pesa references for missing ones
+    const usedRefs = new Set();
+    const transactionsWithRefs = periodTx.map((t) => {
+      let refCode = t.referenceCode || '';
+      const isMpesa = (t.paymentMethod || '').toUpperCase() === 'MPESA' || 
+                     (t.paymentMethod || '').toUpperCase() === 'M-PESA' ||
+                     !t.paymentMethod; // Default to MPESA if no method specified
+      if (isMpesa && !refCode) {
+        refCode = genReferenceCode(usedRefs);
+        usedRefs.add(refCode);
+      }
+      return { ...t, referenceCode: refCode };
+    });
+
+    // Regroup transactions with new references
+    const groupedWithRefs = groupTransactionsCategoryPayee(transactionsWithRefs);
+
     const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}.`;
 
     const insights = (intelligence || []).slice(0, 8);
 
-    const catSummaryRows = grouped.map((c) => `
+    const catSummaryRows = groupedWithRefs.map((c) => `
       <w:tr>
         <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName)}</w:t></w:r></w:p></w:tc>
         <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(c.categoryTotal))}</w:t></w:r></w:p></w:tc>
       </w:tr>
     `).join('');
 
-    const breakdownXml = grouped.map((c) => {
+    const breakdownXml = groupedWithRefs.map((c) => {
       const payeesXml = c.payees.map((p) => {
         const txRows = p.transactions.map((t) => `
           <w:tr>
@@ -1883,14 +1900,66 @@ export default function ReportsImport() {
                 Export Word
               </button>
               <button
-                onClick={() => downloadCSV('transactions_filtered.csv', periodTx.map((t) => ({
-                  category: t.category || '',
-                  payeeName: t.payeeName || '',
-                  description: t.description || '',
-                  amount: t.amount || 0,
-                  dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
-                  referenceCode: t.referenceCode || '',
-                })))}
+                onClick={() => {
+                  // Generate automatic M-Pesa references for missing ones
+                  const usedRefs = new Set();
+                  const transactionsWithRefs = periodTx.map((t) => {
+                    let refCode = t.referenceCode || '';
+                    const isMpesa = (t.paymentMethod || '').toUpperCase() === 'MPESA' || 
+                                   (t.paymentMethod || '').toUpperCase() === 'M-PESA' ||
+                                   !t.paymentMethod; // Default to MPESA if no method specified
+                    if (isMpesa && !refCode) {
+                      refCode = genReferenceCode(usedRefs);
+                      usedRefs.add(refCode);
+                    }
+                    return {
+                      category: t.category || '',
+                      payeeName: t.payeeName || '',
+                      description: t.description || '',
+                      amount: t.amount || 0,
+                      dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
+                      referenceCode: refCode,
+                    };
+                  });
+                  
+                  // Group by category for organized CSV
+                  const groupedByCategory = {};
+                  transactionsWithRefs.forEach(t => {
+                    if (!groupedByCategory[t.category]) {
+                      groupedByCategory[t.category] = [];
+                    }
+                    groupedByCategory[t.category].push(t);
+                  });
+                  
+                  // Create organized CSV with category groups
+                  const organizedRows = [];
+                  Object.keys(groupedByCategory).sort().forEach(category => {
+                    // Add category header
+                    organizedRows.push({
+                      category: category,
+                      payeeName: '',
+                      description: '',
+                      amount: '',
+                      dateOfPayment: '',
+                      referenceCode: '',
+                    });
+                    // Add transactions for this category
+                    groupedByCategory[category].forEach(t => {
+                      organizedRows.push(t);
+                    });
+                    // Add empty row for separation
+                    organizedRows.push({
+                      category: '',
+                      payeeName: '',
+                      description: '',
+                      amount: '',
+                      dateOfPayment: '',
+                      referenceCode: '',
+                    });
+                  });
+                  
+                  downloadCSV('transactions_filtered.csv', organizedRows);
+                }}
                 disabled={periodTx.length === 0}
                 className="text-sm font-medium text-slate-700 hover:underline disabled:opacity-50 dark:text-slate-200"
               >
