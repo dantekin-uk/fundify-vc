@@ -57,6 +57,7 @@ export default function ReportsImport() {
   const [importFunderId, setImportFunderId] = useState('');
   const [importRows, setImportRows] = useState([]);
   const [importErrors, setImportErrors] = useState([]);
+  const [importWarnings, setImportWarnings] = useState([]);
   const [importing, setImporting] = useState(false);
   const [importStats, setImportStats] = useState({ total: 0, accepted: 0, ignored: 0 });
   const [importSuccess, setImportSuccess] = useState(0);
@@ -83,6 +84,8 @@ export default function ReportsImport() {
       paidVia: r.paidVia || '',
       mpesaCode: r.mpesaCode || '',
       description: r.description || '',
+      _hasValidDate: r._hasValidDate,
+      _hasValidAmount: r._hasValidAmount,
     }));
   }, [importRows]);
 
@@ -192,6 +195,7 @@ export default function ReportsImport() {
 
   const onPickCSV = async (file) => {
     setImportErrors([]);
+    setImportWarnings([]);
     setImportRows([]);
     setImportStats({ total: 0, accepted: 0, ignored: 0 });
     if (!file) return;
@@ -281,8 +285,17 @@ export default function ReportsImport() {
         const amtRaw = idxAmount >= 0 ? (line[idxAmount] || '') : '';
         const amt = Number(String(amtRaw).replace(/,/g, ''));
         const date = dateRaw ? new Date(dateRaw) : null;
-        if (!date || isNaN(date.getTime())) { ignored++; continue; }
-        if (!Number.isFinite(amt) || amt <= 0) { ignored++; continue; }
+        
+        // Skip rows with completely missing date and amount
+        if ((!dateRaw || dateRaw.trim() === '') && (!amtRaw || amtRaw.trim() === '')) { ignored++; continue; }
+        
+        // Allow rows with missing data but warn about invalid dates/amounts
+        if (dateRaw && (isNaN(date.getTime()) || date.getFullYear() < 2000 || date.getFullYear() > 2100)) { 
+          // Invalid date but continue processing
+        }
+        if (amtRaw && (!Number.isFinite(amt) || amt <= 0)) { 
+          // Invalid amount but continue processing
+        }
 
         const paidVia = idxPaidVia >= 0 ? String(line[idxPaidVia] || '').trim() : '';
         const mpesaCode = idxMpesaCode >= 0 ? String(line[idxMpesaCode] || '').trim() : '';
@@ -297,18 +310,27 @@ export default function ReportsImport() {
         }
 
         rows.push({
-          date: date.toISOString(),
-          amount: amt,
-          category: category || 'General',
+          date: date && !isNaN(date.getTime()) ? date.toISOString().slice(0, 10) : '',
+          amount: Number.isFinite(amt) && amt > 0 ? amt : 0,
+          category,
           description,
-          paidVia: paidVia || null,
-          mpesaCode: mpesaCode || null,
+          paidVia,
+          mpesaCode,
           projectId,
+          projectName,
+          _rowIndex: r,
+          _hasValidDate: date && !isNaN(date.getTime()),
+          _hasValidAmount: Number.isFinite(amt) && amt > 0,
         });
       }
       setImportRows(rows);
-      setImportStats({ total: Math.max(grid.length - 1, 0), accepted: rows.length, ignored });
+      const validRows = rows.filter(r => r._hasValidDate && r._hasValidAmount);
+      setImportStats({ total: Math.max(grid.length - 1, 0), accepted: validRows.length, ignored });
       if (!rows.length) setImportErrors(['No valid rows found (check date/amount formats)']);
+      else if (validRows.length < rows.length) {
+        const invalidCount = rows.length - validRows.length;
+        setImportWarnings([`${invalidCount} row(s) have invalid dates or amounts and will be skipped during import`]);
+      }
     } catch (e) {
       setImportErrors([e?.message || 'Failed to parse CSV']);
     }
@@ -401,6 +423,9 @@ export default function ReportsImport() {
 
     try {
       for (const r of importRows) {
+        // Skip rows with invalid dates or amounts
+        if (!r._hasValidDate || !r._hasValidAmount) continue;
+        
         const paidVia = (r.paidVia || 'MPESA').toString().trim() || 'MPESA';
         const isMpesa = paidVia.toUpperCase() === 'MPESA';
         const mpesaCode = isMpesa
@@ -434,7 +459,8 @@ export default function ReportsImport() {
           setReportFunderId(fid);
         }
       } catch {}
-      setImportSuccess(rows.length || 0);
+      const validRows = importRows.filter(r => r._hasValidDate && r._hasValidAmount);
+      setImportSuccess(validRows.length || 0);
       setImportRows([]);
     } catch (e) {
       setImportErrors([e?.message || 'Import failed']);
@@ -2034,10 +2060,10 @@ export default function ReportsImport() {
               </select>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">CSV file</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">CSV / Excel file</label>
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 className="w-full text-sm text-slate-700 dark:text-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
                 onChange={(e) => onPickCSV(e.target.files && e.target.files[0])}
               />
@@ -2054,6 +2080,15 @@ export default function ReportsImport() {
               <div className="text-sm font-medium text-rose-700 dark:text-rose-200">Import issues</div>
               <ul className="mt-1 text-sm text-rose-700 dark:text-rose-200 list-disc pl-5">
                 {importErrors.map((e, idx) => (<li key={idx}>{e}</li>))}
+              </ul>
+            </div>
+          )}
+
+          {importWarnings.length > 0 && (
+            <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-950/40 ring-1 ring-amber-200 dark:ring-amber-900/40 p-3">
+              <div className="text-sm font-medium text-amber-700 dark:text-amber-200">Import warnings</div>
+              <ul className="mt-1 text-sm text-amber-700 dark:text-amber-200 list-disc pl-5">
+                {importWarnings.map((w, idx) => (<li key={idx}>{w}</li>))}
               </ul>
             </div>
           )}
@@ -2082,16 +2117,23 @@ export default function ReportsImport() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {importPreview.map((r, idx) => (
-                      <tr key={idx}>
-                        <td className="px-3 py-2 whitespace-nowrap text-slate-900 dark:text-slate-100">{r.date ? new Date(r.date).toLocaleDateString() : ''}</td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap text-slate-900 dark:text-slate-100">{r.amount}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.category}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.paidVia}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.mpesaCode}</td>
-                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.description}</td>
-                      </tr>
-                    ))}
+                    {importPreview.map((r, idx) => {
+                      const hasInvalidData = !r._hasValidDate || !r._hasValidAmount;
+                      return (
+                        <tr key={idx} className={hasInvalidData ? 'bg-rose-50 dark:bg-rose-950/20' : ''}>
+                          <td className={`px-3 py-2 whitespace-nowrap ${!r._hasValidDate ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-slate-900 dark:text-slate-100'}`}>
+                            {r.date ? new Date(r.date).toLocaleDateString() : 'Invalid date'}
+                          </td>
+                          <td className={`px-3 py-2 text-right whitespace-nowrap ${!r._hasValidAmount ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-slate-900 dark:text-slate-100'}`}>
+                            {r.amount}
+                          </td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.category}</td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.paidVia}</td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.mpesaCode}</td>
+                          <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.description}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
