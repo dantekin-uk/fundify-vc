@@ -136,8 +136,32 @@ function parseDate(v) {
   if (v instanceof Date && !isNaN(v.getTime())) return v;
   const s = String(v).trim();
   if (!s) return null;
+  
+  // Try standard Date parsing first
   const d = new Date(s);
   if (!isNaN(d.getTime())) return d;
+  
+  // Handle DD/MM/YYYY format (common in many regions) - try this first
+  const ddmmyyyyMatch = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    // Validate day/month ranges to distinguish from MM/DD/YYYY
+    const dayNum = parseInt(day);
+    const monthNum = parseInt(month);
+    if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
+      const parsedDate = new Date(parseInt(year), monthNum - 1, dayNum);
+      if (!isNaN(parsedDate.getTime())) return parsedDate;
+    }
+  }
+  
+  // Handle YYYY-MM-DD format (ISO)
+  const ymdMatch = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
+    const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsedDate.getTime())) return parsedDate;
+  }
+  
   return null;
 }
 

@@ -2068,6 +2068,7 @@ export default function ReportsImport() {
                 onChange={(e) => onPickCSV(e.target.files && e.target.files[0])}
               />
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Required columns: date, amount. Optional: category, description, paid_via, mpesa_referral, project</div>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Supported date formats: DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY</div>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <button onClick={downloadImportTemplate} className="text-xs font-medium text-slate-700 hover:underline dark:text-slate-200">Download template CSV</button>
                 <button onClick={downloadImportExample} className="text-xs font-medium text-slate-700 hover:underline dark:text-slate-200">Download example CSV</button>
