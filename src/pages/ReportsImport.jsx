@@ -572,7 +572,7 @@ export default function ReportsImport() {
               <w:rPr>
                 <w:sz w:val="20"/>
               </w:rPr>
-              <w:t>${escapeXml(formatAmount(r.amount || 0))} ${escapeXml(orgCurrency || '')}</w:t>
+              <w:t>${escapeXml(formatAmount(r.amount || 0, 'KES'))} KSH</w:t>
             </w:r>
           </w:p>
         </w:tc>
@@ -660,7 +660,7 @@ export default function ReportsImport() {
           <w:rPr>
             <w:sz w:val="20"/>
           </w:rPr>
-          <w:t>Total Amount: ${escapeXml(formatAmount(totalAmount))} ${escapeXml(orgCurrency || '')}</w:t>
+          <w:t>Total Amount: ${escapeXml(formatAmount(totalAmount, 'KES'))} KSH</w:t>
         </w:r>
       </w:p>
       <w:p>
@@ -943,7 +943,7 @@ export default function ReportsImport() {
                   <w:b/>
                   <w:sz w:val="20"/>
                 </w:rPr>
-                <w:t>${escapeXml(formatAmount(totalAmount))} ${escapeXml(orgCurrency || '')}</w:t>
+                <w:t>${escapeXml(formatAmount(totalAmount, 'KES'))} KSH</w:t>
               </w:r>
             </w:p>
           </w:tc>
@@ -1032,7 +1032,7 @@ export default function ReportsImport() {
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.date)}</td>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.category)}</td>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.description)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: right; font-weight: 500; white-space: nowrap;">${escapeHtml(formatAmount(r.amount || 0))} ${escapeHtml(orgCurrency || '')}</td>
+        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: right; font-weight: 500; white-space: nowrap;">${escapeHtml(formatAmount(r.amount || 0, 'KES'))} KSH</td>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.paid_via)}</td>
         <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; font-family: 'Courier New', monospace; text-align: center;">${escapeHtml(r.mpesa_code)}</td>
       </tr>
@@ -1248,8 +1248,8 @@ export default function ReportsImport() {
         <div class="summary-title">Financial Summary</div>
         <div class="summary-grid">
           <div class="summary-item">
-            <div class="summary-value">${escapeHtml(formatAmount(totalAmount))}</div>
-            <div class="summary-label">Total Amount (${escapeHtml(orgCurrency || '')})</div>
+            <div class="summary-value">${escapeHtml(formatAmount(totalAmount, 'KES'))} KSH</div>
+            <div class="summary-label">Total Amount (KSH)</div>
           </div>
           <div class="summary-item">
             <div class="summary-value">${reportRows.filter(r => r.paid_via === 'MPESA').length}</div>
@@ -1280,7 +1280,7 @@ export default function ReportsImport() {
           <tfoot>
             <tr class="total-row">
               <td colspan="3">TOTAL</td>
-              <td>${escapeHtml(formatAmount(totalAmount))} ${escapeHtml(orgCurrency || '')}</td>
+              <td>${escapeHtml(formatAmount(totalAmount, 'KES'))} KSH</td>
               <td colspan="2"></td>
             </tr>
           </tfoot>
@@ -1994,14 +1994,14 @@ export default function ReportsImport() {
               <Card>
                 <CardContent className="p-4">
                   <div className="text-sm text-gray-500 dark:text-slate-400">Total expenditure</div>
-                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{formatAmount(execSummary.totalExpenditure || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
                   <div className="text-sm text-gray-500 dark:text-slate-400">Highest spending category</div>
                   <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">{execSummary.highestSpendingCategory || '-'}</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{formatAmount(execSummary.highestSpendingCategoryTotal || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">{formatAmount(execSummary.highestSpendingCategoryTotal || 0, 'KES')} KSH</div>
                 </CardContent>
               </Card>
               <Card>
@@ -2041,7 +2041,7 @@ export default function ReportsImport() {
                         <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.category}</td>
                         <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.payeeName}</td>
                         <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.description}</td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0, orgCurrency || null)} {orgCurrency || ''}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0, 'KES')} KSH</td>
                         <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{r.paymentMethod}</td>
                         <td className="px-3 py-2 font-mono text-slate-900 dark:text-slate-100">{r.referenceCode}</td>
                       </tr>
@@ -2061,14 +2061,14 @@ export default function ReportsImport() {
                   <div key={c.categoryName} className="rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 p-3">
                     <div className="flex items-center justify-between">
                       <div className="font-semibold text-slate-900 dark:text-slate-100">{c.categoryName}</div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatAmount(c.categoryTotal || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatAmount(c.categoryTotal || 0, 'KES')} KSH</div>
                     </div>
                     <div className="mt-2 space-y-2">
                       {c.payees.slice(0, 6).map((p) => (
                         <div key={p.payeeName} className="rounded-md bg-slate-50 dark:bg-slate-800/40 p-2">
                           <div className="flex items-center justify-between">
                             <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{p.payeeName}</div>
-                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatAmount(p.subtotal || 0, orgCurrency || null)} {orgCurrency || ''}</div>
+                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatAmount(p.subtotal || 0, 'KES')} KSH</div>
                           </div>
                           <div className="mt-2 overflow-x-auto">
                             <table className="min-w-full text-xs">
@@ -2084,7 +2084,7 @@ export default function ReportsImport() {
                                   <tr key={t.transactionId}>
                                     <td className="py-1 pr-3 whitespace-nowrap">{t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : ''}</td>
                                     <td className="py-1 pr-3">{t.description}</td>
-                                    <td className="py-1 text-right whitespace-nowrap">{formatAmount(t.amount || 0, orgCurrency || null)} {orgCurrency || ''}</td>
+                                    <td className="py-1 text-right whitespace-nowrap">{formatAmount(t.amount || 0, 'KES')} KSH</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -2292,7 +2292,7 @@ export default function ReportsImport() {
                     <td className="px-3 py-2 text-sm whitespace-nowrap text-slate-900 dark:text-slate-100">{r.date}</td>
                     <td className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100">{r.category}</td>
                     <td className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100">{r.description}</td>
-                    <td className="px-3 py-2 text-sm text-right whitespace-nowrap text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0)} {orgCurrency || ''}</td>
+                    <td className="px-3 py-2 text-sm text-right whitespace-nowrap text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0, 'KES')} KSH</td>
                     <td className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100">{r.paid_via}</td>
                     <td className="px-3 py-2 text-sm font-mono text-slate-900 dark:text-slate-100">{r.mpesa_code}</td>
                   </tr>
