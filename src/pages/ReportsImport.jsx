@@ -196,39 +196,63 @@ export default function ReportsImport() {
     setImportStats({ total: 0, accepted: 0, ignored: 0 });
     if (!file) return;
     try {
-      const text = await file.text();
-      const grid = (() => {
-        // keep legacy import parser local to this feature
-        // NOTE: this legacy importer expects a CSV with a header row
-        const out = [];
-        let row = [];
-        let cur = '';
-        let inQuotes = false;
-        for (let i = 0; i < text.length; i++) {
-          const ch = text[i];
-          if (inQuotes) {
-            if (ch === '"') {
-              if (text[i + 1] === '"') { cur += '"'; i++; } else { inQuotes = false; }
-            } else cur += ch;
-            continue;
+      const name = String(file.name || '').toLowerCase();
+      let grid;
+
+      if (name.endsWith('.csv') || name.endsWith('.txt')) {
+        const text = await file.text();
+        grid = (() => {
+          // keep legacy import parser local to this feature
+          // NOTE: this legacy importer expects a CSV with a header row
+          const out = [];
+          let row = [];
+          let cur = '';
+          let inQuotes = false;
+          for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (inQuotes) {
+              if (ch === '"') {
+                if (text[i + 1] === '"') { cur += '"'; i++; } else { inQuotes = false; }
+              } else cur += ch;
+              continue;
+            }
+            if (ch === '"') { inQuotes = true; continue; }
+            if (ch === ',') { row.push(cur); cur = ''; continue; }
+            if (ch === '\n') {
+              row.push(cur); cur = '';
+              const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
+              if (!isEmpty) out.push(row);
+              row = [];
+              continue;
+            }
+            if (ch === '\r') continue;
+            cur += ch;
           }
-          if (ch === '"') { inQuotes = true; continue; }
-          if (ch === ',') { row.push(cur); cur = ''; continue; }
-          if (ch === '\n') {
-            row.push(cur); cur = '';
-            const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
-            if (!isEmpty) out.push(row);
-            row = [];
-            continue;
-          }
-          if (ch === '\r') continue;
-          cur += ch;
+          row.push(cur);
+          const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
+          if (!isEmpty) out.push(row);
+          return out;
+        })();
+      } else {
+        // Excel path: use shared spreadsheet reader and convert to grid
+        const res = await readSpreadsheetFile(file);
+        if (res.error) {
+          setImportErrors([res.error]);
+          return;
         }
-        row.push(cur);
-        const isEmpty = row.length === 1 && String(row[0] || '').trim() === '';
-        if (!isEmpty) out.push(row);
-        return out;
-      })();
+        const objRows = Array.isArray(res.rows) ? res.rows : [];
+        if (!objRows.length) {
+          setImportErrors(['File is empty']);
+          return;
+        }
+        const headerKeys = Object.keys(objRows[0] || {});
+        grid = [headerKeys];
+        objRows.forEach((r) => {
+          const line = headerKeys.map((h) => (r && Object.prototype.hasOwnProperty.call(r, h) ? r[h] : ''));
+          grid.push(line);
+        });
+      }
+
       if (!grid.length) {
         setImportErrors(['CSV is empty']);
         return;
@@ -248,14 +272,6 @@ export default function ReportsImport() {
       const idxPaidVia = Math.max(headerIdx('paid_via'), headerIdx('paidvia'), headerIdx('payment_method'));
       const idxMpesaCode = Math.max(headerIdx('mpesa_code'), headerIdx('mpesacode'), headerIdx('mpesa'));
       const idxProject = Math.max(headerIdx('project'), headerIdx('project_name'));
-
-      const errors = [];
-      if (idxAmount < 0) errors.push('Missing required column: amount');
-      if (idxDate < 0) errors.push('Missing required column: date');
-      if (errors.length) {
-        setImportErrors(errors);
-        return;
-      }
 
       const rows = [];
       let ignored = 0;

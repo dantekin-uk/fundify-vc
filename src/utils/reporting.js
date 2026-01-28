@@ -229,20 +229,6 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     return undefined;
   };
 
-  const required = ['dateofpayment', 'category', 'payeename', 'description', 'amount'];
-  const availableKeys = new Set();
-  rows.forEach((r) => Object.keys(r || {}).forEach((k) => availableKeys.add(normalizeHeader(k))));
-  required.forEach((k) => {
-    if (!availableKeys.has(k)) {
-      // allow aliases for date and amount at validation stage
-      if (k === 'dateofpayment' && (availableKeys.has('date') || availableKeys.has('date_of_payment'))) return;
-      if (k === 'amount' && availableKeys.has('amt')) return;
-      errors.push(`Missing required column: ${k}`);
-    }
-  });
-
-  if (errors.length) return { transactions: [], errors, warnings };
-
   const usedRefs = new Set();
   const out = [];
   let ignored = 0;
@@ -251,8 +237,8 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
 
     const date = parseDate(pick(r, ['dateOfPayment', 'date_of_payment', 'date']));
     const amount = parseAmount(pick(r, ['amount', 'amt']));
-    const category = String(pick(r, ['category']) ?? '').trim();
-    const payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier']) ?? '').trim();
+    let category = String(pick(r, ['category']) ?? '').trim();
+    let payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier']) ?? '').trim();
     const description = String(pick(r, ['description', 'purpose', 'narration']) ?? '').trim();
     const paymentMethod = String(pick(r, ['paymentMethod', 'payment_method', 'paid_via', 'paidvia', 'method']) ?? defaultPaymentMethod).trim() || defaultPaymentMethod;
     const referenceCodeRaw = String(pick(r, ['referenceCode', 'reference_code', 'mpesa_reference', 'mpesa_code', 'mpesa_referral', 'mpesa', 'reference']) ?? '').trim();
@@ -261,9 +247,8 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
 
     if (!date || isNaN(date.getTime())) { ignored++; continue; }
     if (!Number.isFinite(amount) || amount <= 0) { ignored++; continue; }
-    if (!category) { ignored++; continue; }
-    if (!payeeName) { ignored++; continue; }
-    if (!description) { ignored++; continue; }
+    if (!category) category = 'Uncategorized';
+    if (!payeeName) payeeName = 'Unknown';
 
     const isMpesa = paymentMethod.toUpperCase() === 'MPESA' || paymentMethod.toUpperCase() === 'M-PESA';
     let referenceCode = referenceCodeRaw;
@@ -292,7 +277,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     });
   }
 
-  if (ignored > 0) warnings.push(`${ignored} row(s) ignored due to missing/invalid required values (date/amount/category/payee/description).`);
+  if (ignored > 0) warnings.push(`${ignored} row(s) ignored due to missing/invalid required values (date/amount).`);
   if (!out.length) errors.push('No valid transactions found.');
   return { transactions: out, errors, warnings };
 }
