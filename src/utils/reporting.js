@@ -272,8 +272,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
 
     if (!date || isNaN(date.getTime())) { ignored++; continue; }
     if (!Number.isFinite(amount) || amount <= 0) { ignored++; continue; }
-    // Keep category empty if not provided
-    if (!payeeName) payeeName = 'Unknown';
+    // Keep category and payee empty if not provided
 
     const isMpesa = paymentMethod.toUpperCase() === 'MPESA' || paymentMethod.toUpperCase() === 'M-PESA';
     let referenceCode = referenceCodeRaw;
@@ -314,7 +313,7 @@ export function groupTransactionsCategoryPayee(transactions) {
 
   for (const t of safeTx) {
     const cat = String(t.category || '').trim(); // Keep empty if no category
-    const payee = String(t.payeeName || 'Unknown').trim() || 'Unknown';
+    const payee = String(t.payeeName || '').trim();
 
     if (!byCategory.has(cat)) byCategory.set(cat, new Map());
     const byPayee = byCategory.get(cat);

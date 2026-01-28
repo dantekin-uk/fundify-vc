@@ -24,7 +24,8 @@ function toCSV(rows) {
 
 function downloadCSV(filename, rows) {
   const csv = toCSV(rows);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const bom = '\ufeff';
+  const blob = new Blob([bom + csv + '\n'], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -494,143 +495,94 @@ export default function ReportsImport() {
 
     const totalAmount = reportRows.reduce((sum, r) => sum + (r.amount || 0), 0);
 
-    const rowsXml = reportRows.map((r) => `
-      <w:tr>
-        <w:tc>
-          <w:tcPr>
-            <w:tcW w:w="1440" w:type="dxa"/>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            </w:tcBorders>
-          </w:tcPr>
-          <w:p>
-            <w:pPr>
-              <w:jc w:val="left"/>
-            </w:pPr>
-            <w:r>
-              <w:rPr>
-                <w:sz w:val="20"/>
-              </w:rPr>
-              <w:t>${escapeXml(r.date)}</w:t>
-            </w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcW w:w="1800" w:type="dxa"/>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            </w:tcBorders>
-          </w:tcPr>
-          <w:p>
-            <w:pPr>
-              <w:jc w:val="left"/>
-            </w:pPr>
-            <w:r>
-              <w:rPr>
-                <w:sz w:val="20"/>
-              </w:rPr>
-              <w:t>${escapeXml(r.category)}</w:t>
-            </w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcW w:w="4200" w:type="dxa"/>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            </w:tcBorders>
-          </w:tcPr>
-          <w:p>
-            <w:pPr>
-              <w:jc w:val="left"/>
-            </w:pPr>
-            <w:r>
-              <w:rPr>
-                <w:sz w:val="20"/>
-              </w:rPr>
-              <w:t>${escapeXml(r.expenditure)}</w:t>
-            </w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcW w:w="1800" w:type="dxa"/>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            </w:tcBorders>
-          </w:tcPr>
-          <w:p>
-            <w:pPr>
-              <w:jc w:val="right"/>
-            </w:pPr>
-            <w:r>
-              <w:rPr>
-                <w:sz w:val="20"/>
-              </w:rPr>
-              <w:t>${escapeXml(formatAmount(r.amount || 0, 'KES'))} KSH</w:t>
-            </w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcW w:w="1560" w:type="dxa"/>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            </w:tcBorders>
-          </w:tcPr>
-          <w:p>
-            <w:pPr>
-              <w:jc w:val="left"/>
-            </w:pPr>
-            <w:r>
-              <w:rPr>
-                <w:sz w:val="20"/>
-              </w:rPr>
-              <w:t>${escapeXml(r.paid_via)}</w:t>
-            </w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcW w:w="1200" w:type="dxa"/>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            </w:tcBorders>
-          </w:tcPr>
-          <w:p>
-            <w:pPr>
-              <w:jc w:val="center"/>
-            </w:pPr>
-            <w:r>
-              <w:rPr>
-                <w:sz w:val="18"/>
-                <w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>
-              </w:rPr>
-              <w:t>${escapeXml(r.mpesa_code)}</w:t>
-            </w:r>
-          </w:p>
-        </w:tc>
-      </w:tr>
-    `).join('');
+    const byCategory = new Map();
+    reportRows.forEach((r) => {
+      const cat = String(r.category || '').trim() || 'Uncategorized';
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat).push(r);
+    });
+    const categoryXml = Array.from(byCategory.entries()).map(([catName, rows]) => {
+      const subtotal = rows.reduce((s, x) => s + (x.amount || 0), 0);
+      const rowsXml = rows.map((r) => `
+        <w:tr>
+          <w:tc>
+            <w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(r.date)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr><w:tcW w:w="1800" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(r.category)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr><w:tcW w:w="3600" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(r.expenditure)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr><w:tcW w:w="1800" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(formatAmount(r.amount || 0, 'KES'))} KSH</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr><w:tcW w:w="1560" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(r.paid_via)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(r.mpesa_reference)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr><w:tcW w:w="1560" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:t>${escapeXml(r.phone_number)}</w:t></w:r></w:p>
+          </w:tc>
+        </w:tr>
+      `).join('');
+      const headerXml = `
+        <w:p>
+          <w:pPr>
+            <w:shd w:val="clear" w:color="auto" w:fill="eef2ff"/>
+            <w:spacing w:before="160" w:after="120"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr><w:b/><w:sz w:val="24"/></w:rPr>
+            <w:t>Category: ${escapeXml(catName)}</w:t>
+          </w:r>
+        </w:p>
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="0" w:after="120"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr><w:sz w:val="20"/><w:color w:val="6b7280"/></w:rPr>
+            <w:t>Subtotal: ${escapeXml(formatAmount(subtotal, 'KES'))} KSH • Transactions: ${rows.length}</w:t>
+          </w:r>
+        </w:p>
+        <w:tbl>
+          <w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders></w:tblPr>
+          <w:tblGrid>
+            <w:gridCol w:w="1440"/><w:gridCol w:w="1800"/><w:gridCol w:w="3600"/><w:gridCol w:w="1800"/><w:gridCol w:w="1560"/><w:gridCol w:w="1200"/><w:gridCol w:w="1560"/>
+          </w:tblGrid>
+          <w:tr>
+            <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="3498db"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="FFFFFF"/></w:rPr><w:t>Date</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1800" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="3498db"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="FFFFFF"/></w:rPr><w:t>Category</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="3600" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="3498db"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="FFFFFF"/></w:rPr><w:t>Expenditure</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1800" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="3498db"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="FFFFFF"/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1560" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="3498db"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="FFFFFF"/></w:rPr><w:t>Paid via</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="3498db"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="FFFFFF"/></w:rPr><w:t>M-Pesa Reference</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1560" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="3498db"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="FFFFFF"/></w:rPr><w:t>M-Pesa Number</w:t></w:r></w:p></w:tc>
+          </w:tr>
+          ${rowsXml}
+          <w:tr>
+            <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>TOTAL:</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1800" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="3600" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1800" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(formatAmount(subtotal, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1560" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:tcPr><w:tcW w:w="1560" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr><w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t></w:t></w:r></w:p></w:tc>
+          </w:tr>
+        </w:tbl>
+      `;
+      return headerXml;
+    }).join('');
 
     const wordXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <?mso-application progid="Word.Document"?>
@@ -687,322 +639,7 @@ export default function ReportsImport() {
           <w:t>Other Payment Methods: ${reportRows.filter(r => r.paid_via !== 'MPESA').length}</w:t>
         </w:r>
       </w:p>
-      <w:tbl>
-        <w:tblPr>
-          <w:tblW w:w="0" w:type="auto"/>
-          <w:tblBorders>
-            <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            <w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-            <w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-          </w:tblBorders>
-        </w:tblPr>
-        <w:tblGrid>
-          <w:gridCol w:w="1440"/>
-          <w:gridCol w:w="1800"/>
-          <w:gridCol w:w="4200"/>
-          <w:gridCol w:w="1800"/>
-          <w:gridCol w:w="1560"/>
-          <w:gridCol w:w="1200"/>
-        </w:tblGrid>
-        <w:tr>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1440" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="3498db"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                  <w:color w:val="FFFFFF"/>
-                </w:rPr>
-                <w:t>Date</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1800" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="3498db"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                  <w:color w:val="FFFFFF"/>
-                </w:rPr>
-                <w:t>Category</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="4200" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="3498db"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                  <w:color w:val="FFFFFF"/>
-                </w:rPr>
-                <w:t>Expenditure</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1800" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="3498db"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                  <w:color w:val="FFFFFF"/>
-                </w:rPr>
-                <w:t>Amount</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1560" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="3498db"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                  <w:color w:val="FFFFFF"/>
-                </w:rPr>
-                <w:t>Paid via</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1200" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="3498db"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                  <w:color w:val="FFFFFF"/>
-                </w:rPr>
-                <w:t>M-Pesa Referral</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-        </w:tr>
-        ${rowsXml}
-        <w:tr>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1440" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="right"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                </w:rPr>
-                <w:t>TOTAL:</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1800" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="left"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:sz w:val="20"/>
-                </w:rPr>
-                <w:t></w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="4200" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="left"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:sz w:val="20"/>
-                </w:rPr>
-                <w:t></w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1800" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="right"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                  <w:sz w:val="20"/>
-                </w:rPr>
-                <w:t>${escapeXml(formatAmount(totalAmount, 'KES'))} KSH</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1560" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="left"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:sz w:val="20"/>
-                </w:rPr>
-                <w:t></w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:tcW w:w="1200" w:type="dxa"/>
-              <w:shd w:val="clear" w:color="auto" w:fill="f8f9fa"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="left"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:sz w:val="20"/>
-                </w:rPr>
-                <w:t></w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-        </w:tr>
-      </w:tbl>
+      ${categoryXml}
     </w:sect>
   </w:body>
 </w:wordDocument>`;
@@ -1035,17 +672,56 @@ export default function ReportsImport() {
 
     const totalAmount = reportRows.reduce((sum, r) => sum + (r.amount || 0), 0);
 
-    const rowsHtml = reportRows.map((r, idx) => `
-      <tr>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.date)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.category)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.expenditure)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: right; font-weight: 500; white-space: nowrap;">${escapeHtml(formatAmount(r.amount || 0, 'KES'))} KSH</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.paid_via)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; font-family: 'Courier New', monospace; text-align: center;">${escapeHtml(r.mpesa_reference)}</td>
-        <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: center;">${escapeHtml(r.phone_number)}</td>
-      </tr>
-    `).join('');
+    const groups = new Map();
+    reportRows.forEach((r) => {
+      const cat = String(r.category || '').trim() || 'Uncategorized';
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat).push(r);
+    });
+    const sectionsHtml = Array.from(groups.entries()).map(([cat, rows]) => {
+      const subtotal = rows.reduce((s, x) => s + (x.amount || 0), 0);
+      const rowsHtml = rows.map((r) => `
+        <tr>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.date)}</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.category)}</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.expenditure)}</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: right; font-weight: 500; white-space: nowrap;">${escapeHtml(formatAmount(r.amount || 0, 'KES'))} KSH</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px;">${escapeHtml(r.paid_via)}</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; font-family: 'Courier New', monospace; text-align: center;">${escapeHtml(r.mpesa_reference)}</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e0e0e0; font-size: 13px; text-align: center;">${escapeHtml(r.phone_number)}</td>
+        </tr>
+      `).join('');
+      return `
+        <div style="margin-top: 18px;">
+          <h3 style="margin: 0 0 6px; font-size: 16px; color: #2c3e50;">Category: ${escapeHtml(cat)}</h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 12%;">Date</th>
+                  <th style="width: 15%;">Category</th>
+                  <th style="width: 30%;">Expenditure</th>
+                  <th style="width: 15%;">Amount</th>
+                  <th style="width: 13%;">Paid Via</th>
+                  <th style="width: 10%;">M-Pesa Reference</th>
+                  <th style="width: 15%;">M-Pesa Number</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="3">TOTAL</td>
+                  <td>${escapeHtml(formatAmount(subtotal, 'KES'))} KSH</td>
+                  <td colspan="3"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      `;
+    }).join('');
 
     const html = `<!DOCTYPE html>
 <html>
@@ -1271,31 +947,7 @@ export default function ReportsImport() {
         </div>
       </div>
 
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 12%;">Date</th>
-              <th style="width: 15%;">Category</th>
-              <th style="width: 35%;">Expenditure</th>
-              <th style="width: 15%;">Amount</th>
-              <th style="width: 13%;">Paid Via</th>
-              <th style="width: 10%;">M-Pesa Reference</th>
-              <th style="width: 15%;">Phone Number</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-          <tfoot>
-            <tr class="total-row">
-              <td colspan="3">TOTAL</td>
-              <td>${escapeHtml(formatAmount(totalAmount, 'KES'))} KSH</td>
-              <td colspan="2"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      ${sectionsHtml}
     </div>
   </body>
 </html>`;
@@ -1344,6 +996,21 @@ export default function ReportsImport() {
       projectName: t.projectName || '',
     }));
   }, [periodTx]);
+
+  const exportReportCSV = () => {
+    if (!reportRows.length) return;
+    const rows = reportRows.map((r) => ({
+      Date: r.date,
+      Category: r.category,
+      Expenditure: r.expenditure,
+      'Amount (KSH)': Math.round(r.amount || 0),
+      'Paid Via': r.paid_via,
+      'M-Pesa Reference': r.mpesa_reference,
+      'M-Pesa Number': r.phone_number,
+      Status: r.status,
+    }));
+    downloadCSV('funder_transactions.csv', rows);
+  };
 
   const exportHierarchyHTML = () => {
     const generated = new Date().toLocaleString();
@@ -2209,7 +1876,7 @@ export default function ReportsImport() {
                 Export Word
               </button>
               <button
-                onClick={() => downloadCSV('funder_transactions.csv', reportRows)}
+                onClick={exportReportCSV}
                 className="text-sm font-medium text-slate-700 hover:underline disabled:opacity-50 dark:text-slate-200"
                 disabled={!reportRows.length}
               >
