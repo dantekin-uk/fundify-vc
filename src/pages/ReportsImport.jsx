@@ -1351,19 +1351,13 @@ export default function ReportsImport() {
     const catSummaryRows = grouped.map((c) => `
       <tr>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${esc(c.categoryName)}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal))}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
       </tr>
     `).join('');
 
     const narrative = (() => {
-      const topCat = execSummary.highestSpendingCategory || '-';
-      const topCatAmt = execSummary.highestSpendingCategoryTotal || 0;
-      return `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}. Highest spending category is ${topCat} (${formatAmount(topCatAmt)}).`;
+      return `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
     })();
-
-    const insightsHtml = (intelligence || []).slice(0, 6).map((it) => `
-      <li style="margin:4px 0; color:${it.type === 'warning' ? '#b45309' : '#334155'};">${esc(it.text)}</li>
-    `).join('');
 
     const body = grouped.map((c) => {
       const payeesHtml = c.payees.map((p) => {
@@ -1371,7 +1365,7 @@ export default function ReportsImport() {
           <tr>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount))}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
           </tr>
@@ -1380,7 +1374,7 @@ export default function ReportsImport() {
           <div style="margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;">
             <div style="display:flex;justify-content:space-between;gap:12px;">
               <div style="font-weight:700;">Payee: ${esc(p.payeeName)}</div>
-              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal))}</div>
+              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal, 'KES'))} KSH</div>
             </div>
             <table style="width:100%;border-collapse:collapse;margin-top:8px;">
               <thead>
@@ -1451,14 +1445,6 @@ export default function ReportsImport() {
 
     <div style="height:12px;"></div>
     <div class="card">
-      <div style="font-weight:800;">Intelligence Insights</div>
-      <ul style="margin:8px 0 0 18px;padding:0;">
-        ${insightsHtml || '<li class="muted">No insights detected.</li>'}
-      </ul>
-    </div>
-
-    <div style="height:12px;"></div>
-    <div class="card">
       <div style="font-weight:800;">Category Breakdown</div>
       ${body || '<div class="muted" style="margin-top:8px;">No transactions for this period.</div>'}
     </div>
@@ -1515,13 +1501,13 @@ export default function ReportsImport() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}.`;
+    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
     function escSummarySafe(x) { return x == null ? '-' : String(x); }
 
     const catSummaryRows = grouped.map((c) => `
       <tr>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${esc(c.categoryName)}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal))}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
       </tr>
     `).join('');
     const insightsHtml = (intelligence || []).slice(0, 6).map((it) => `
@@ -1533,7 +1519,7 @@ export default function ReportsImport() {
           <tr>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount))}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
           </tr>
@@ -1542,7 +1528,7 @@ export default function ReportsImport() {
           <div style="margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;">
             <div style="display:flex;justify-content:space-between;gap:12px;">
               <div style="font-weight:700;">Payee: ${esc(p.payeeName)}</div>
-              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal))}</div>
+              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal, 'KES'))} KSH</div>
             </div>
             <table style="width:100%;border-collapse:collapse;margin-top:8px;">
               <thead>
@@ -1609,14 +1595,6 @@ export default function ReportsImport() {
         <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
       </div>
       <div class="muted" style="margin-top:10px;">${esc(narrative)}</div>
-    </div>
-
-    <div style="height:12px;"></div>
-    <div class="card">
-      <div style="font-weight:800;">Intelligence Insights</div>
-      <ul style="margin:8px 0 0 18px;padding:0;">
-        ${insightsHtml || '<li class="muted">No insights detected.</li>'}
-      </ul>
     </div>
 
     <div style="height:12px;"></div>
