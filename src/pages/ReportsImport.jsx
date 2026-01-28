@@ -1515,7 +1515,7 @@ export default function ReportsImport() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}. Highest spending category is ${escSummarySafe(execSummary.highestSpendingCategory)} (${formatAmount(execSummary.highestSpendingCategoryTotal || 0)}).`;
+    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}.`;
     function escSummarySafe(x) { return x == null ? '-' : String(x); }
 
     const catSummaryRows = grouped.map((c) => `
@@ -1676,7 +1676,7 @@ export default function ReportsImport() {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
-    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}. Highest spending category is ${execSummary.highestSpendingCategory || '-'} (${formatAmount(execSummary.highestSpendingCategoryTotal || 0)}).`;
+    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0)}.`;
 
     const insights = (intelligence || []).slice(0, 8);
 
@@ -1691,10 +1691,11 @@ export default function ReportsImport() {
       const payeesXml = c.payees.map((p) => {
         const txRows = p.transactions.map((t) => `
           <w:tr>
-            <w:tc><w:p><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:r><w:t>${escapeXml(t.description)}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName)}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>${escapeXml(p.payeeName)}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount))}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:r><w:t>${escapeXml(t.paymentMethod || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>
           </w:tr>
         `).join('');
@@ -1714,11 +1715,12 @@ export default function ReportsImport() {
               </w:tblBorders>
             </w:tblPr>
             <w:tr>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Date</w:t></w:r></w:p></w:tc>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Description</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Category</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payee Name</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Expenditure</w:t></w:r></w:p></w:tc>
               <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Method</w:t></w:r></w:p></w:tc>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Ref</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payment Date</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Number</w:t></w:r></w:p></w:tc>
             </w:tr>
             ${txRows}
           </w:tbl>
@@ -1747,12 +1749,8 @@ export default function ReportsImport() {
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Executive Summary</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0))}</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Number of Categories: ${escapeXml(execSummary.numberOfCategories || 0)}</w:t></w:r></w:p>
-      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Highest Spending Category: ${escapeXml(execSummary.highestSpendingCategory || '-')}</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period Covered: ${escapeXml(periodLabel)}</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(narrative)}</w:t></w:r></w:p>
-
-      <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Intelligence Insights</w:t></w:r></w:p>
-      ${insightsXml || '<w:p><w:r><w:t>- No insights detected.</w:t></w:r></w:p>'}
 
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Category Breakdown</w:t></w:r></w:p>
       ${breakdownXml || '<w:p><w:r><w:t>No transactions for this period.</w:t></w:r></w:p>'}
@@ -1886,16 +1884,12 @@ export default function ReportsImport() {
               </button>
               <button
                 onClick={() => downloadCSV('transactions_filtered.csv', periodTx.map((t) => ({
-                  transactionId: t.transactionId,
-                  dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toISOString() : '',
-                  category: t.category,
-                  payeeName: t.payeeName,
-                  description: t.description,
-                  amount: t.amount,
-                  paymentMethod: t.paymentMethod || '',
+                  category: t.category || '',
+                  payeeName: t.payeeName || '',
+                  description: t.description || '',
+                  amount: t.amount || 0,
+                  dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
                   referenceCode: t.referenceCode || '',
-                  projectName: t.projectName || '',
-                  reportingPeriod: t.reportingPeriod || '',
                 })))}
                 disabled={periodTx.length === 0}
                 className="text-sm font-medium text-slate-700 hover:underline disabled:opacity-50 dark:text-slate-200"
