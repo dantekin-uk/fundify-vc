@@ -68,7 +68,7 @@ export default function ReportsImport() {
   const [reportTx, setReportTx] = useState([]);
   const [reportErrors, setReportErrors] = useState([]);
   const [reportWarnings, setReportWarnings] = useState([]);
-  const [reportType, setReportType] = useState('monthly'); // monthly | quarterly | yearly
+  const [reportType, setReportType] = useState('all'); // all | monthly | quarterly | yearly
   const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [reportQuarter, setReportQuarter] = useState(() => String(Math.floor(new Date().getMonth() / 3) + 1));
   const [reportYear, setReportYear] = useState(() => String(new Date().getFullYear()));
@@ -91,6 +91,9 @@ export default function ReportsImport() {
   }, [importRows]);
 
   const selectedPeriod = useMemo(() => {
+    if (reportType === 'all') {
+      return {};
+    }
     if (reportType === 'monthly') {
       const [yy, mm] = String(reportMonth || '').split('-');
       return { type: 'monthly', year: Number(yy), month: Number(mm) };
@@ -102,6 +105,7 @@ export default function ReportsImport() {
   }, [reportType, reportMonth, reportQuarter, reportYear]);
 
   const periodLabel = useMemo(() => {
+    if (reportType === 'all') return 'All';
     if (reportType === 'monthly') {
       const [yy, mm] = String(reportMonth || '').split('-');
       if (!yy || !mm) return '';
@@ -981,6 +985,7 @@ export default function ReportsImport() {
     setReportErrors(normalized.errors || []);
     setReportWarnings(normalized.warnings || []);
     setReportTx(normalized.transactions || []);
+    setReportType('all');
   };
 
   const reportPreview = useMemo(() => {
@@ -1016,7 +1021,7 @@ export default function ReportsImport() {
     const generated = new Date().toLocaleString();
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : 'Annual Expenditure Report');
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
 
     const esc = (v) => String(v ?? '')
       .replace(/&/g, '&amp;')
@@ -1161,7 +1166,7 @@ export default function ReportsImport() {
     const generated = new Date().toLocaleString();
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : 'Annual Expenditure Report');
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
     const filename = `NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.pdf`;
 
     // Reuse the same HTML but open it in a new window for printing
@@ -1322,7 +1327,7 @@ export default function ReportsImport() {
     const generatedDate = new Date().toLocaleString();
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : 'Annual Expenditure Report');
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
 
     const escapeXml = (v) => String(v ?? '')
       .replace(/&/g, '&amp;')
@@ -1505,6 +1510,7 @@ export default function ReportsImport() {
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Report type</label>
               <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none">
+                <option value="all">All</option>
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="yearly">Yearly</option>
