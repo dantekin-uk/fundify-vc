@@ -151,12 +151,24 @@ function parseDate(v) {
   if (v == null || v === '') return null;
   // Excel may give a Date object
   if (v instanceof Date && !isNaN(v.getTime())) return v;
+  // Excel may give a serial number (days since 1899-12-30)
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const base = Date.UTC(1899, 11, 30);
+    const ms = Math.round(v * 86400000);
+    const d = new Date(base + ms);
+    if (!isNaN(d.getTime())) return d;
+  }
   const s = String(v).trim();
   if (!s) return null;
-  
-  // Try standard Date parsing first
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) return d;
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const num = Number(s);
+    if (Number.isFinite(num)) {
+      const base = Date.UTC(1899, 11, 30);
+      const ms = Math.round(num * 86400000);
+      const d = new Date(base + ms);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
   
   // Handle DD/MM/YYYY format (common in many regions) - try this first
   const ddmmyyyyMatch = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
@@ -214,6 +226,13 @@ function parseDate(v) {
       const parsed = new Date(y, m, 1);
       if (!isNaN(parsed.getTime())) return parsed;
     }
+  }
+  
+  // Fallback: try native parse, but guard against nonsensical years
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    const yy = d.getFullYear();
+    if (yy >= 1900 && yy <= 2100) return d;
   }
   
   return null;

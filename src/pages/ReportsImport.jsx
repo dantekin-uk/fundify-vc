@@ -59,6 +59,45 @@ function toTitleCase(str) {
   return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
+/**
+ * Parses a date from a string or Excel serial number.
+ * @param {any} dateInput The raw date value from the spreadsheet.
+ * @returns {Date | null} A valid Date object or null.
+ */
+function parseDate(dateInput) {
+  if (dateInput == null || String(dateInput).trim() === '') return null;
+
+  let serial = NaN;
+  if (typeof dateInput === 'number') {
+    serial = dateInput;
+  } else if (typeof dateInput === 'string') {
+    const parts = dateInput.split(/[\/\-]/);
+    if (parts.length === 3 && Number(parts[2]) > 30000) {
+      serial = Number(parts[2]);
+    }
+  }
+
+  if (!isNaN(serial) && serial > 1 && serial < 300000) {
+    // It's an Excel serial date.
+    // Based on https://stackoverflow.com/a/16229494
+    // 25569 is days from 1900 to 1970 epoch.
+    const utc_days = Math.floor(serial - 25569);
+    const date = new Date(utc_days * 86400000);
+    if (!isNaN(date.getTime())) return date;
+  }
+
+  // Fallback for standard date strings like '2023-10-27' or '10/27/2023'
+  const date = new Date(dateInput);
+  if (!isNaN(date.getTime())) {
+    const year = date.getFullYear();
+    if (year > 1980 && year < 2100) {
+      return date;
+    }
+  }
+
+  return null;
+}
+
 export default function ReportsImport() {
   const { funders: rawFunders, projects: rawProjects, expenses: rawExpenses, addExpense, updateExpense } = useFinance();
   const { role, currency: orgCurrency } = useOrg();
@@ -1032,6 +1071,26 @@ export default function ReportsImport() {
       return;
     }
     const rows = Array.isArray(res.rows) ? res.rows : [];
+
+    // Pre-process rows to correct dates before normalization
+    if (rows.length > 0) {
+      const header = Object.keys(rows[0]);
+      const dateKey = header.find(k => {
+          const lowerK = String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return lowerK === 'dateofpayment' || lowerK === 'date';
+      });
+
+      if (dateKey) {
+          rows.forEach(row => {
+              if (row[dateKey] != null) {
+                  const correctedDate = parseDate(row[dateKey]);
+                  // Pass a valid ISO string to the next step, or null if invalid
+                  row[dateKey] = correctedDate ? correctedDate.toISOString() : null;
+              }
+          });
+      }
+    }
+
     setReportFileRows(rows);
     const normalizedResult = normalizeImportedRowsToTransactions(rows, { defaultPaymentMethod: 'MPESA' });
 
@@ -1256,6 +1315,7 @@ export default function ReportsImport() {
       
       const txRows = allCategoryTx.map((t) => `
           <tr>
+            <td>${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
             <td>${esc(t.payeeName)}</td>
             <td>${esc(t.description)}</td>
             <td class="text-right">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
@@ -1264,7 +1324,7 @@ export default function ReportsImport() {
           </tr>
         `).join('');
 
-      const rowsHtml = txRows || `<tr><td colspan="5" class="no-transactions">No transactions for this period</td></tr>`;
+      const rowsHtml = txRows || `<tr><td colspan="6" class="no-transactions">No transactions for this period</td></tr>`;
 
       return `
         <div class="category-section">
@@ -1275,6 +1335,7 @@ export default function ReportsImport() {
           <table>
             <thead style="background:#f8fafc;">
               <tr>
+                <th>Date</th>
                 <th>Payee</th>
                 <th>Expenditure</th>
                 <th class="text-right">Amount</th>
