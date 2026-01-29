@@ -1033,17 +1033,22 @@ export default function ReportsImport() {
     }
     const rows = Array.isArray(res.rows) ? res.rows : [];
     setReportFileRows(rows);
-    const normalized = normalizeImportedRowsToTransactions(rows, { defaultPaymentMethod: 'MPESA' });
-    setReportErrors(normalized.errors || []);
-    setReportWarnings(normalized.warnings || []);
-    setReportTx(normalized.transactions || []);
     const normalizedResult = normalizeImportedRowsToTransactions(rows, { defaultPaymentMethod: 'MPESA' });
 
     // Normalize categories to handle inconsistencies (case, whitespace, empty).
     // This prevents issues like 'Staffs' and 'staffs' being treated as different categories,
     // and groups items with no category under 'Uncategorized'.
+    // Also implements "fill down" for Excel merged cells where category is only in the first row.
+    let lastCategory = '';
     const transactions = (normalizedResult.transactions || []).map(t => {
-      const rawCategory = String(t.category || '').trim();
+      let rawCategory = String(t.category || '').trim();
+      
+      if (rawCategory) {
+        lastCategory = rawCategory;
+      } else if (lastCategory) {
+        rawCategory = lastCategory;
+      }
+
       const category = toTitleCase(rawCategory) || 'Uncategorized';
       return { ...t, category };
     });

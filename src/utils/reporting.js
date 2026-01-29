@@ -311,6 +311,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
   const out = [];
   let warnInvalidDate = 0;
   let warnInvalidAmount = 0;
+  let lastCategory = '';
   for (let idx = 0; idx < rows.length; idx++) {
     const r = rows[idx] || {};
 
@@ -334,6 +335,15 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     }
     // allow zero/negative amounts to be included (refunds/adjustments)
     // Keep category and payee empty if not provided
+
+    // Forward-fill category for rows that are part of a category block but have empty category cells
+    // Typical Excel structure: first row has category only (payee empty), subsequent rows have payees with blank category cells
+    if (!category && (payeeName || description || Number.isFinite(amount))) {
+      category = lastCategory;
+    }
+    if (category) {
+      lastCategory = category;
+    }
 
     const isMpesa = paymentMethod.toUpperCase() === 'MPESA' || paymentMethod.toUpperCase() === 'M-PESA';
     let referenceCode = referenceCodeRaw;
