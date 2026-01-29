@@ -147,7 +147,7 @@ function parseAmount(v) {
   return neg ? -out : out;
 }
 
-function parseDate(v) {
+export function parseDate(v) {
   if (v == null || v === '') return null;
   // Excel may give a Date object
   if (v instanceof Date && !isNaN(v.getTime())) return v;

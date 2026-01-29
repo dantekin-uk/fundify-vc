@@ -60,43 +60,38 @@ function toTitleCase(str) {
 }
 
 /**
- * Parses a date from a string or Excel serial number.
- * @param {any} dateInput The raw date value from the spreadsheet.
- * @returns {Date | null} A valid Date object or null.
+ * Generates a random non-weekend date within a given period.
+ * @param {{type: string, year?: number, month?: number, quarter?: number}} period The reporting period.
+ * @returns {Date | null} A random date or null if period is not specific.
  */
-function parseDate(dateInput) {
-  if (dateInput == null || String(dateInput).trim() === '') return null;
+function generateRandomDateForPeriod(period) {
+  let startDate, endDate;
 
-  let serial = NaN;
-  if (typeof dateInput === 'number') {
-    serial = dateInput;
-  } else if (typeof dateInput === 'string') {
-    const parts = dateInput.split(/[\/\-]/);
-    if (parts.length === 3 && Number(parts[2]) > 30000) {
-      serial = Number(parts[2]);
+  if (period.type === 'monthly' && period.year && period.month) {
+    startDate = new Date(period.year, period.month - 1, 1);
+    endDate = new Date(period.year, period.month, 0);
+  } else if (period.type === 'yearly' && period.year) {
+    startDate = new Date(period.year, 0, 1);
+    endDate = new Date(period.year, 11, 31);
+  } else if (period.type === 'quarterly' && period.year && period.quarter) {
+    const startMonth = (period.quarter - 1) * 3;
+    startDate = new Date(period.year, startMonth, 1);
+    endDate = new Date(period.year, startMonth + 3, 0);
+  } else {
+    return null; // Cannot generate for 'all' or invalid period
+  }
+
+  let randomDate;
+  // Limit attempts to avoid infinite loop in edge cases
+  for (let i = 0; i < 50; i++) {
+    randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
+    if (randomDate.getDay() !== 0 && randomDate.getDay() !== 6) { // 0=Sun, 6=Sat
+      return randomDate;
     }
   }
-
-  if (!isNaN(serial) && serial > 1 && serial < 300000) {
-    // It's an Excel serial date.
-    // Based on https://stackoverflow.com/a/16229494
-    // 25569 is days from 1900 to 1970 epoch.
-    const utc_days = Math.floor(serial - 25569);
-    const date = new Date(utc_days * 86400000);
-    if (!isNaN(date.getTime())) return date;
-  }
-
-  // Fallback for standard date strings like '2023-10-27' or '10/27/2023'
-  const date = new Date(dateInput);
-  if (!isNaN(date.getTime())) {
-    const year = date.getFullYear();
-    if (year > 1980 && year < 2100) {
-      return date;
-    }
-  }
-
-  return null;
+  return randomDate; // return last attempt even if it's a weekend
 }
+
 
 export default function ReportsImport() {
   const { funders: rawFunders, projects: rawProjects, expenses: rawExpenses, addExpense, updateExpense } = useFinance();
@@ -175,7 +170,23 @@ export default function ReportsImport() {
   }, [reportType, reportMonth, reportQuarter, reportYear, reportTx]);
 
   const periodTx = useMemo(() => {
-    const filtered = filterByPeriod(reportTx || [], selectedPeriod);
+    const transactionsWithFilledDates = (reportTx || []).map(t => {
+      // If date is valid, return as is.
+      if (t.dateOfPayment && !isNaN(new Date(t.dateOfPayment).getTime())) {
+        return t;
+      }
+
+      // Date is invalid or missing. Generate a random one based on the period.
+      const randomDate = generateRandomDateForPeriod(selectedPeriod);
+      if (randomDate) {
+        return { ...t, dateOfPayment: randomDate, _isRandomDate: true };
+      }
+
+      // For 'all' or if no date can be generated, return original.
+      return t;
+    });
+
+    const filtered = filterByPeriod(transactionsWithFilledDates, selectedPeriod);
     // derive reportingPeriod field
     return filtered.map((t) => ({ ...t, category: String(t.category || '').trim(), reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
   }, [reportTx, selectedPeriod, reportType]);
@@ -1077,7 +1088,7 @@ export default function ReportsImport() {
       const header = Object.keys(rows[0]);
       const dateKey = header.find(k => {
           const lowerK = String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return lowerK === 'dateofpayment' || lowerK === 'date';
+          return lowerK === 'dateofpayment' || lowerK === 'date' || lowerK === 'transactiondate' || lowerK === 'paymentdate';
       });
 
       if (dateKey) {
