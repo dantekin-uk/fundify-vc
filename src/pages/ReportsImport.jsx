@@ -119,11 +119,26 @@ export default function ReportsImport() {
   const periodTx = useMemo(() => {
     const filtered = filterByPeriod(reportTx || [], selectedPeriod);
     // derive reportingPeriod field
-    return filtered.map((t) => ({ ...t, reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
     return filtered.map((t) => ({ ...t, category: String(t.category || '').trim(), reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
   }, [reportTx, selectedPeriod, reportType]);
 
-  const grouped = useMemo(() => groupTransactionsCategoryPayee(periodTx), [periodTx]);
+  const grouped = useMemo(() => {
+    const groups = groupTransactionsCategoryPayee(periodTx);
+    // Ensure all categories from the full import are represented, even if zero for this period
+    if (reportTx && reportTx.length > 0) {
+      const allCats = new Set(reportTx.map(t => String(t.category || '').trim()).filter(c => c));
+      const present = new Set(groups.map(g => g.categoryName));
+      for (const cat of allCats) {
+        if (!present.has(cat)) {
+          groups.push({ categoryName: cat, categoryTotal: 0, payees: [] });
+        }
+      }
+      // Sort by category name
+      groups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+    }
+    return groups;
+  }, [periodTx, reportTx]);
+
   const execSummary = useMemo(() => buildExecutiveSummary(periodTx), [periodTx]);
   const intelligence = useMemo(() => buildIntelligenceInsights(periodTx), [periodTx]);
 
@@ -1043,48 +1058,43 @@ export default function ReportsImport() {
     })();
 
     const body = grouped.map((c) => {
-      const payeesHtml = c.payees.map((p) => {
-        const txRows = p.transactions.map((t) => `
+      const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
+      allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
+
+      const txRows = allCategoryTx.map((t) => `
           <tr>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.payeeName)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.phoneNumber || '')}</td>
           </tr>
         `).join('');
-        return `
-          <div style="margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;">
-            <div style="display:flex;justify-content:space-between;gap:12px;">
-              <div style="font-weight:700;">Payee: ${esc(p.payeeName)}</div>
-              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal, 'KES'))} KSH</div>
-            </div>
-            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-              <thead>
-                <tr>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Date</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Description</th>
-                  <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Amount</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Method</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa No.</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${txRows}
-              </tbody>
-            </table>
-          </div>
-        `;
-      }).join('');
+
+      const rowsHtml = txRows || `<tr><td colspan="6" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName)} in this period</td></tr>`;
+
       return `
         <section style="margin-top:18px;">
-          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:8px;">
             <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
             <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
           </div>
-          ${payeesHtml}
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Date</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Payee</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Description</th>
+                <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Amount</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Method</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
         </section>
       `;
     }).join('');
@@ -1199,48 +1209,43 @@ export default function ReportsImport() {
       <li style="margin:4px 0; color:${it.type === 'warning' ? '#b45309' : '#334155'};">${esc(it.text)}</li>
     `).join('');
     const body = grouped.map((c) => {
-      const payeesHtml = c.payees.map((p) => {
-        const txRows = p.transactions.map((t) => `
+      const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
+      allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
+
+      const txRows = allCategoryTx.map((t) => `
           <tr>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.payeeName)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.phoneNumber || '')}</td>
           </tr>
         `).join('');
-        return `
-          <div style="margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;">
-            <div style="display:flex;justify-content:space-between;gap:12px;">
-              <div style="font-weight:700;">Payee: ${esc(p.payeeName)}</div>
-              <div style="font-weight:700;">Subtotal: ${esc(formatAmount(p.subtotal, 'KES'))} KSH</div>
-            </div>
-            <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-              <thead>
-                <tr>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Date</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Description</th>
-                  <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Amount</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Method</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
-                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa No.</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${txRows}
-              </tbody>
-            </table>
-          </div>
-        `;
-      }).join('');
+
+      const rowsHtml = txRows || `<tr><td colspan="6" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName)} in this period</td></tr>`;
+
       return `
         <section style="margin-top:18px;">
-          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:8px;">
             <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
             <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
           </div>
-          ${payeesHtml}
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Date</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Payee</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Description</th>
+                <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Amount</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Method</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
         </section>
       `;
     }).join('');
@@ -1358,6 +1363,18 @@ export default function ReportsImport() {
     // Regroup transactions with new references
     const groupedWithRefs = groupTransactionsCategoryPayee(transactionsWithRefs);
 
+    // Ensure all categories are present in Word export too
+    if (reportTx && reportTx.length > 0) {
+      const allCats = new Set(reportTx.map(t => String(t.category || '').trim()).filter(c => c));
+      const present = new Set(groupedWithRefs.map(g => g.categoryName));
+      for (const cat of allCats) {
+        if (!present.has(cat)) {
+          groupedWithRefs.push({ categoryName: cat, categoryTotal: 0, payees: [] });
+        }
+      }
+      groupedWithRefs.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+    }
+
     const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
 
     const insights = (intelligence || []).slice(0, 8);
@@ -1370,21 +1387,28 @@ export default function ReportsImport() {
     `).join('');
 
     const breakdownXml = groupedWithRefs.map((c) => {
-      const payeesXml = c.payees.map((p) => {
-        const txRows = p.transactions.map((t) => `
+      const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
+      allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
+
+      const txRows = allCategoryTx.map((t) => `
           <w:tr>
-            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(c.categoryName || '')}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(p.payeeName || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.payeeName || '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.paymentMethod || '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>
-            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.phoneNumber || '')}</w:t></w:r></w:p></w:tc>
           </w:tr>
         `).join('');
 
-        return `
-          <w:p><w:r><w:rPr><w:b/><w:sz w:val="22"/></w:rPr><w:t>Payee: ${escapeXml(p.payeeName)} (Subtotal: ${escapeXml(formatAmount(p.subtotal, 'KES'))} KSH)</w:t></w:r></w:p>
+      const rowsXml = txRows || `
+        <w:tr>
+          <w:tc><w:tcPr><w:gridSpan w:val="6"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:i/><w:color w:val="666666"/><w:t>No transactions for ${escapeXml(c.categoryName)} in this period</w:t></w:r></w:p></w:tc>
+        </w:tr>
+      `;
+
+      return `
+        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal, 'KES'))} KSH)</w:t></w:r></w:p>
           <w:tbl>
             <w:tblPr>
               <w:tblW w:w="0" w:type="auto"/>
@@ -1398,23 +1422,15 @@ export default function ReportsImport() {
               </w:tblBorders>
             </w:tblPr>
             <w:tr>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Category</w:t></w:r></w:p></w:tc>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payee Name</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Date</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payee</w:t></w:r></w:p></w:tc>
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Expenditure</w:t></w:r></w:p></w:tc>
               <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payment Date</w:t></w:r></w:p></w:tc>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Number</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Method</w:t></w:r></w:p></w:tc>
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Ref</w:t></w:r></w:p></w:tc>
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa No.</w:t></w:r></w:p></w:tc>
             </w:tr>
-            ${txRows}
+            ${rowsXml}
           </w:tbl>
-        `;
-      }).join('');
-
-      return `
-        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal, 'KES'))} KSH)</w:t></w:r></w:p>
-        ${payeesXml}
       `;
     }).join('');
 
