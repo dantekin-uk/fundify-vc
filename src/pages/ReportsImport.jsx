@@ -120,6 +120,7 @@ export default function ReportsImport() {
     const filtered = filterByPeriod(reportTx || [], selectedPeriod);
     // derive reportingPeriod field
     return filtered.map((t) => ({ ...t, reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
+    return filtered.map((t) => ({ ...t, category: String(t.category || '').trim(), reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
   }, [reportTx, selectedPeriod, reportType]);
 
   const grouped = useMemo(() => groupTransactionsCategoryPayee(periodTx), [periodTx]);
@@ -1050,6 +1051,7 @@ export default function ReportsImport() {
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.phoneNumber || '')}</td>
           </tr>
         `).join('');
         return `
@@ -1066,6 +1068,7 @@ export default function ReportsImport() {
                   <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Amount</th>
                   <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Method</th>
                   <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa No.</th>
                 </tr>
               </thead>
               <tbody>
@@ -1204,6 +1207,7 @@ export default function ReportsImport() {
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.phoneNumber || '')}</td>
           </tr>
         `).join('');
         return `
@@ -1220,6 +1224,7 @@ export default function ReportsImport() {
                   <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Amount</th>
                   <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">Method</th>
                   <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
+                  <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb;">M-Pesa No.</th>
                 </tr>
               </thead>
               <tbody>
@@ -1374,6 +1379,7 @@ export default function ReportsImport() {
             <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.phoneNumber || '')}</w:t></w:r></w:p></w:tc>
           </w:tr>
         `).join('');
 
@@ -1398,6 +1404,8 @@ export default function ReportsImport() {
               <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payment Date</w:t></w:r></w:p></w:tc>
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Number</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Ref</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa No.</w:t></w:r></w:p></w:tc>
             </w:tr>
             ${txRows}
           </w:tbl>
