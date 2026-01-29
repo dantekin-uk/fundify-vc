@@ -92,6 +92,47 @@ function generateRandomDateForPeriod(period) {
   return randomDate; // return last attempt even if it's a weekend
 }
 
+/**
+ * Parses a date from a string or Excel serial number.
+ * @param {any} dateInput The raw date value from the spreadsheet.
+ * @returns {Date | null} A valid Date object or null.
+ */
+function parseDate(dateInput) {
+  if (dateInput == null || String(dateInput).trim() === '') return null;
+
+  let serial = NaN;
+  if (typeof dateInput === 'number') {
+    serial = dateInput;
+  } else if (typeof dateInput === 'string') {
+    // Check for Excel serial date as string
+    if (/^\d+(\.\d+)?$/.test(dateInput)) {
+        const val = Number(dateInput);
+        if (val > 30000) serial = val;
+    }
+    
+    if (isNaN(serial)) {
+        // Try parsing standard date string
+        const date = new Date(dateInput);
+        if (!isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            if (year > 1980 && year < 2100) {
+            return date;
+            }
+        }
+    }
+  }
+
+  if (!isNaN(serial) && serial > 1 && serial < 300000) {
+    // It's an Excel serial date.
+    // Based on https://stackoverflow.com/a/16229494
+    // 25569 is days from 1900 to 1970 epoch.
+    const utc_days = Math.floor(serial - 25569);
+    const date = new Date(utc_days * 86400000);
+    if (!isNaN(date.getTime())) return date;
+  }
+
+  return null;
+}
 
 export default function ReportsImport() {
   const { funders: rawFunders, projects: rawProjects, expenses: rawExpenses, addExpense, updateExpense } = useFinance();
@@ -1097,6 +1138,14 @@ export default function ReportsImport() {
                   const correctedDate = parseDate(row[dateKey]);
                   // Pass a valid ISO string to the next step, or null if invalid
                   row[dateKey] = correctedDate ? correctedDate.toISOString() : null;
+                  try {
+                    const correctedDate = parseDate(row[dateKey]);
+                    // Pass a valid ISO string to the next step, or null if invalid
+                    row[dateKey] = correctedDate ? correctedDate.toISOString() : null;
+                  } catch (e) {
+                    console.warn('Date parsing error', e);
+                    row[dateKey] = null;
+                  }
               }
           });
       }
