@@ -125,9 +125,26 @@ export function genReferenceCode(existingSet) {
 function parseAmount(v) {
   const s = String(v ?? '').trim();
   if (!s) return NaN;
-  const cleaned = s.replace(/,/g, '').replace(/[^\d.\-]/g, '');
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : NaN;
+  let t = s.replace(/\s+/g, '');
+  let neg = false;
+  if (/^\(.*\)$/.test(t)) {
+    neg = true;
+    t = t.slice(1, -1);
+  }
+  t = t.replace(/^KES|^KSH|^KSh/i, '');
+  t = t.replace(/KES$|KSH$|KSh$/i, '');
+  let mul = 1;
+  const suf = t.match(/([km])$/i);
+  if (suf) {
+    const ch = suf[1].toLowerCase();
+    mul = ch === 'k' ? 1_000 : 1_000_000;
+    t = t.slice(0, -1);
+  }
+  t = t.replace(/,/g, '').replace(/[^\d.\-]/g, '');
+  const n = Number(t);
+  if (!Number.isFinite(n)) return NaN;
+  const out = n * mul;
+  return neg ? -out : out;
 }
 
 function parseDate(v) {
@@ -160,6 +177,43 @@ function parseDate(v) {
     const [, year, month, day] = ymdMatch;
     const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     if (!isNaN(parsedDate.getTime())) return parsedDate;
+  }
+
+  const mon = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+  };
+  let m;
+  let y;
+  let day;
+  const a = s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})$/);
+  if (a) {
+    day = parseInt(a[1]);
+    m = mon[a[2].slice(0,3).toLowerCase()];
+    y = parseInt(a[3]);
+    if (m != null) {
+      const parsed = new Date(y, m, day);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+  }
+  const b = s.match(/^([A-Za-z]{3,})\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (b) {
+    m = mon[b[1].slice(0,3).toLowerCase()];
+    day = parseInt(b[2]);
+    y = parseInt(b[3]);
+    if (m != null) {
+      const parsed = new Date(y, m, day);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+  }
+  const c = s.match(/^([A-Za-z]{3,})\s+(\d{4})$/);
+  if (c) {
+    m = mon[c[1].slice(0,3).toLowerCase()];
+    y = parseInt(c[2]);
+    if (m != null) {
+      const parsed = new Date(y, m, 1);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
   }
   
   return null;
@@ -255,12 +309,13 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
 
   const usedRefs = new Set();
   const out = [];
-  let ignored = 0;
+  let warnInvalidDate = 0;
+  let warnInvalidAmount = 0;
   for (let idx = 0; idx < rows.length; idx++) {
     const r = rows[idx] || {};
 
     const date = parseDate(pick(r, ['dateOfPayment', 'date_of_payment', 'date']));
-    const amount = parseAmount(pick(r, ['amount', 'amt']));
+    let amount = parseAmount(pick(r, ['amount', 'amt']));
     let category = String(pick(r, ['category']) ?? '').trim();
     let payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier']) ?? '').trim();
     const description = String(pick(r, ['expenditure', 'description', 'purpose', 'narration']) ?? '').trim();
@@ -270,10 +325,19 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     const transactionIdRaw = String(pick(r, ['transactionId', 'transaction_id', 'id']) ?? '').trim();
     const phoneNumberRaw = String(pick(r, ['phoneNumber', 'phone_number', 'msisdn', 'phone']) ?? '').trim();
 
-    if (!date || isNaN(date.getTime())) { ignored++; continue; }
-    if (!Number.isFinite(amount) || amount <= 0) { ignored++; continue; }
+    if (!date || isNaN(date.getTime())) { 
+      warnInvalidDate++; 
+    }
+    if (!Number.isFinite(amount)) {
+      warnInvalidAmount++;
+      amount = 0;
+    }
+    // allow zero/negative amounts to be included (refunds/adjustments)
     // Keep category and payee empty if not provided
 
+    if (!payeeName && description) {
+      payeeName = description;
+    }
     const isMpesa = paymentMethod.toUpperCase() === 'MPESA' || paymentMethod.toUpperCase() === 'M-PESA';
     let referenceCode = referenceCodeRaw;
     if (isMpesa) {
@@ -302,8 +366,9 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     });
   }
 
-  if (ignored > 0) warnings.push(`${ignored} row(s) ignored due to missing/invalid required values (date/amount).`);
-  if (!out.length) errors.push('No valid transactions found.');
+  if (warnInvalidDate > 0) warnings.push(`${warnInvalidDate} row(s) have invalid/missing dates and were included with empty dates.`);
+  if (warnInvalidAmount > 0) warnings.push(`${warnInvalidAmount} row(s) have invalid/missing amounts and were included as 0.`);
+  if (!out.length) errors.push('No transactions found.');
   return { transactions: out, errors, warnings };
 }
 
