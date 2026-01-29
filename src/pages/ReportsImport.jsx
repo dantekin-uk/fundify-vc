@@ -60,39 +60,6 @@ function toTitleCase(str) {
 }
 
 /**
- * Generates a random non-weekend date within a given period.
- * @param {{type: string, year?: number, month?: number, quarter?: number}} period The reporting period.
- * @returns {Date | null} A random date or null if period is not specific.
- */
-function generateRandomDateForPeriod(period) {
-  let startDate, endDate;
-
-  if (period.type === 'monthly' && period.year && period.month) {
-    startDate = new Date(period.year, period.month - 1, 1);
-    endDate = new Date(period.year, period.month, 0);
-  } else if (period.type === 'yearly' && period.year) {
-    startDate = new Date(period.year, 0, 1);
-    endDate = new Date(period.year, 11, 31);
-  } else if (period.type === 'quarterly' && period.year && period.quarter) {
-    const startMonth = (period.quarter - 1) * 3;
-    startDate = new Date(period.year, startMonth, 1);
-    endDate = new Date(period.year, startMonth + 3, 0);
-  } else {
-    return null; // Cannot generate for 'all' or invalid period
-  }
-
-  let randomDate;
-  // Limit attempts to avoid infinite loop in edge cases
-  for (let i = 0; i < 50; i++) {
-    randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
-    if (randomDate.getDay() !== 0 && randomDate.getDay() !== 6) { // 0=Sun, 6=Sat
-      return randomDate;
-    }
-  }
-  return randomDate; // return last attempt even if it's a weekend
-}
-
-/**
  * Parses a date from a string or Excel serial number.
  * @param {any} dateInput The raw date value from the spreadsheet.
  * @returns {Date | null} A valid Date object or null.
@@ -191,13 +158,25 @@ export default function ReportsImport() {
   const periodLabel = useMemo(() => {
     if (reportType === 'all') {
       if (!reportTx || reportTx.length === 0) return 'All Time';
-      const dates = reportTx.map(t => t.dateOfPayment).filter(Boolean);
-      if (dates.length === 0) return 'All Time';
-      const minDate = new Date(Math.min.apply(null, dates));
-      const maxDate = new Date(Math.max.apply(null, dates));
-      const formatOpts = { month: 'short', year: 'numeric' };
-      const start = minDate.toLocaleDateString(undefined, formatOpts);
-      const end = maxDate.toLocaleDateString(undefined, formatOpts);
+      const validDates = reportTx
+        .map(t => t.dateOfPayment ? new Date(t.dateOfPayment) : null)
+        .filter(d => d && !isNaN(d.getTime()));
+
+      if (validDates.length === 0) return 'All Time';
+
+      let minTime = validDates[0].getTime();
+      let maxTime = validDates[0].getTime();
+      for (const d of validDates) {
+        const t = d.getTime();
+        if (t < minTime) minTime = t;
+        if (t > maxTime) maxTime = t;
+      }
+
+      const minDate = new Date(minTime);
+      const maxDate = new Date(maxTime);
+      const formatOpts = { month: 'long', year: 'numeric' };
+      const start = minDate.toLocaleDateString('en-US', formatOpts);
+      const end = maxDate.toLocaleDateString('en-US', formatOpts);
       return start === end ? start : `${start} - ${end}`;
     }
     if (reportType === 'monthly') {
@@ -211,23 +190,7 @@ export default function ReportsImport() {
   }, [reportType, reportMonth, reportQuarter, reportYear, reportTx]);
 
   const periodTx = useMemo(() => {
-    const transactionsWithFilledDates = (reportTx || []).map(t => {
-      // If date is valid, return as is.
-      if (t.dateOfPayment && !isNaN(new Date(t.dateOfPayment).getTime())) {
-        return t;
-      }
-
-      // Date is invalid or missing. Generate a random one based on the period.
-      const randomDate = generateRandomDateForPeriod(selectedPeriod);
-      if (randomDate) {
-        return { ...t, dateOfPayment: randomDate, _isRandomDate: true };
-      }
-
-      // For 'all' or if no date can be generated, return original.
-      return t;
-    });
-
-    const filtered = filterByPeriod(transactionsWithFilledDates, selectedPeriod);
+    const filtered = filterByPeriod(reportTx || [], selectedPeriod);
     // derive reportingPeriod field
     return filtered.map((t) => ({ ...t, category: String(t.category || '').trim(), reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
   }, [reportTx, selectedPeriod, reportType]);
@@ -1227,9 +1190,7 @@ export default function ReportsImport() {
       </tr>
     `).join('');
 
-    const narrative = (() => {
-      return `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
-    })();
+    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
 
     const body = grouped.map((c) => {
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
@@ -1368,7 +1329,7 @@ export default function ReportsImport() {
       </tr>
     `).join('');
 
-    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
+    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
 
     const body = grouped.map((c) => {
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
@@ -1642,7 +1603,7 @@ export default function ReportsImport() {
       groupedWithRefs.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
     }
 
-    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
+    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
 
     const insights = (intelligence || []).slice(0, 8);
 
