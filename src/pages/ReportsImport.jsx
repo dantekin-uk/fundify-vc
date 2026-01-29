@@ -91,9 +91,7 @@ export default function ReportsImport() {
   }, [importRows]);
 
   const selectedPeriod = useMemo(() => {
-    if (reportType === 'all') {
-      return {};
-    }
+    if (reportType === 'all') return {};
     if (reportType === 'monthly') {
       const [yy, mm] = String(reportMonth || '').split('-');
       return { type: 'monthly', year: Number(yy), month: Number(mm) };
@@ -105,7 +103,17 @@ export default function ReportsImport() {
   }, [reportType, reportMonth, reportQuarter, reportYear]);
 
   const periodLabel = useMemo(() => {
-    if (reportType === 'all') return 'All';
+    if (reportType === 'all') {
+      if (!reportTx || reportTx.length === 0) return 'All Time';
+      const dates = reportTx.map(t => t.dateOfPayment).filter(Boolean);
+      if (dates.length === 0) return 'All Time';
+      const minDate = new Date(Math.min.apply(null, dates));
+      const maxDate = new Date(Math.max.apply(null, dates));
+      const formatOpts = { month: 'short', year: 'numeric' };
+      const start = minDate.toLocaleDateString(undefined, formatOpts);
+      const end = maxDate.toLocaleDateString(undefined, formatOpts);
+      return start === end ? start : `${start} - ${end}`;
+    }
     if (reportType === 'monthly') {
       const [yy, mm] = String(reportMonth || '').split('-');
       if (!yy || !mm) return '';
@@ -114,7 +122,7 @@ export default function ReportsImport() {
     }
     if (reportType === 'quarterly') return `Q${reportQuarter} ${reportYear}`;
     return String(reportYear || '');
-  }, [reportType, reportMonth, reportQuarter, reportYear]);
+  }, [reportType, reportMonth, reportQuarter, reportYear, reportTx]);
 
   const periodTx = useMemo(() => {
     const filtered = filterByPeriod(reportTx || [], selectedPeriod);
@@ -1175,153 +1183,246 @@ export default function ReportsImport() {
   const exportHierarchyPDF = () => {
     if (!periodTx.length) return;
     // "PDF export" via print dialog (Save as PDF)
-    // This matches your existing pattern elsewhere and is reliable for long tables.
     const generated = new Date().toLocaleString();
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
       : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
     const filename = `NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.pdf`;
 
-    // Reuse the same HTML but open it in a new window for printing
-    // (we keep it in-memory so it works without server-side rendering).
-    const htmlBlob = new Blob([], { type: 'text/html;charset=utf-8' });
-    void htmlBlob; // keeps linter happy; we build html by calling exportHierarchyHTML logic inline
-
-    // Build HTML by calling exportHierarchyHTML's internal builder (copy minimal parts)
-    // We simply call exportHierarchyHTML to download HTML AND then print the same doc.
-    // To avoid double-building, we build again here (fast enough for typical sizes).
     const esc = (v) => String(v ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
-    function escSummarySafe(x) { return x == null ? '-' : String(x); }
 
     const catSummaryRows = grouped.map((c) => `
       <tr>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${esc(c.categoryName)}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
+        <td>${esc(c.categoryName)}</td>
+        <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
       </tr>
     `).join('');
-    const insightsHtml = (intelligence || []).slice(0, 6).map((it) => `
-      <li style="margin:4px 0; color:${it.type === 'warning' ? '#b45309' : '#334155'};">${esc(it.text)}</li>
-    `).join('');
+
+    const narrative = `Total expenditure for ${periodLabel} is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
+
     const body = grouped.map((c) => {
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
       allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
 
       const txRows = allCategoryTx.map((t) => `
           <tr>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.payeeName)}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
+            <td>${esc(t.payeeName)}</td>
+            <td>${esc(t.description)}</td>
+            <td class="text-right">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
+            <td>${esc(t.paymentMethod || '')}</td>
+            <td class="font-mono">${esc(t.referenceCode || '')}</td>
           </tr>
         `).join('');
 
-      const rowsHtml = txRows || `<tr><td colspan="6" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName)} in this period</td></tr>`;
+      const rowsHtml = txRows || `<tr><td colspan="5" class="no-transactions">No transactions for this period</td></tr>`;
 
       return `
-        <section style="margin-top:18px;">
-          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:8px;">
-            <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
-            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
+        <div class="category-section">
+          <div class="category-header">
+            <h3>Category: ${esc(c.categoryName)}</h3>
+            <div class="total">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
           </div>
-          <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+          <table>
             <thead style="background:#f8fafc;">
               <tr>
-                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Date</th>
-                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Payee</th>
-                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Description</th>
-                <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Amount</th>
-                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Method</th>
-                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
+                <th>Payee</th>
+                <th>Expenditure</th>
+                <th class="text-right">Amount</th>
+                <th>Method</th>
+                <th>M-Pesa Reference</th>
               </tr>
             </thead>
             <tbody>
               ${rowsHtml}
             </tbody>
           </table>
-        </section>
+        </div>
       `;
     }).join('');
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>${esc(title)} - ${esc(periodLabel)}</title>
   <style>
-    @page { size: A4; margin: 16mm; }
-    body { font-family: Segoe UI, Arial, sans-serif; color:#0f172a; margin:0; background:#fff; }
-    .container { max-width: 980px; margin: 0 auto; padding: 24px; }
-    .muted { color:#64748b; font-size: 13px; }
-    .card { border:1px solid #e5e7eb; border-radius: 12px; padding: 14px; background:#fff; }
-    .grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    @media print { .container { padding: 0; } }
+    @page { size: A4; margin: 20mm; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #333;
+      font-size: 10pt;
+      line-height: 1.4;
+    }
+    .report-header {
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 15px;
+    }
+    .report-header h1 {
+      font-size: 22pt;
+      margin: 0;
+      color: #1a202c;
+    }
+    .report-header .org-name {
+      font-size: 14pt;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+    .report-header .meta-info {
+      font-size: 9pt;
+      color: #718096;
+    }
+    .summary-card {
+      background-color: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 25px;
+      page-break-inside: avoid;
+    }
+    .summary-card h2 {
+      font-size: 14pt;
+      margin: 0 0 15px 0;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 10px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    .summary-item .label {
+      font-size: 9pt;
+      color: #718096;
+      text-transform: uppercase;
+    }
+    .summary-item .value {
+      font-size: 12pt;
+      font-weight: 600;
+      color: #2d3748;
+    }
+    .category-section {
+      margin-top: 30px;
+      page-break-inside: avoid;
+    }
+    .category-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      background-color: #edf2f7;
+      padding: 10px 15px;
+      border-radius: 6px 6px 0 0;
+      border: 1px solid #e2e8f0;
+      border-bottom: none;
+    }
+    .category-header h3 {
+      font-size: 13pt;
+      margin: 0;
+      color: #2d3748;
+    }
+    .category-header .total {
+      font-size: 12pt;
+      font-weight: bold;
+      color: #2d3748;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #e2e8f0;
+    }
+    thead th {
+      background-color: #2d3748;
+      color: white;
+      padding: 10px;
+      text-align: left;
+      font-size: 9pt;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    tbody td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 9pt;
+      vertical-align: top;
+    }
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+    tbody tr:nth-child(even) {
+      background-color: #f7fafc;
+    }
+    .text-right { text-align: right; }
+    .font-mono { font-family: 'Courier New', Courier, monospace; }
+    .no-transactions {
+      text-align: center;
+      padding: 20px;
+      color: #718096;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
-        <div>
-          <div style="font-weight:900;font-size:18px;">Organization Name: NAPTA</div>
-          <div style="font-weight:800;font-size:16px;margin-top:4px;">${esc(title)}</div>
-          <div class="muted" style="margin-top:4px;">Reporting Period: ${esc(periodLabel)}</div>
-        </div>
-        <div class="muted">Date Generated: ${esc(generated)}</div>
+  <div class="report-header">
+    <div class="org-name">NAPTA</div>
+    <h1>${esc(title)}</h1>
+    <div class="meta-info">
+      Period: ${esc(periodLabel)} | Generated: ${esc(generated)}
+    </div>
+  </div>
+
+  <div class="summary-card">
+    <h2>Executive Summary</h2>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="label">Total Expenditure</div>
+        <div class="value">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Transaction Count</div>
+        <div class="value">${esc(execSummary.numberOfTransactions)}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Categories</div>
+        <div class="value">${esc(execSummary.numberOfCategories)}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Highest Spending Category</div>
+        <div class="value">${esc(execSummary.highestSpendingCategory)}</div>
       </div>
     </div>
+    <p style="font-size: 10pt; margin-top: 15px;">${esc(narrative)}</p>
+  </div>
 
-    <div style="height:12px;"></div>
-    <div class="card">
-      <div style="font-weight:800;">Executive Summary</div>
-      <div class="grid" style="margin-top:10px;">
-        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div></div>
-        <div><div class="muted">Number of Categories</div><div style="font-weight:800;">${esc(execSummary.numberOfCategories)}</div></div>
-        <div><div class="muted">Highest Spending Category</div><div style="font-weight:800;">${esc(execSummary.highestSpendingCategory)}</div></div>
-        <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
-      </div>
-      <div class="muted" style="margin-top:10px;">${esc(narrative)}</div>
-    </div>
+  ${body}
 
-    <div style="height:12px;"></div>
-    <div class="card">
-      <div style="font-weight:800;">Category Breakdown</div>
-      ${body || '<div class="muted" style="margin-top:8px;">No transactions for this period.</div>'}
-    </div>
-
-    <div style="height:12px;"></div>
-    <div class="card">
-      <div style="font-weight:800;">Category Summary Table</div>
-      <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Category</th>
-            <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Total Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${catSummaryRows || ''}
-        </tbody>
-      </table>
-    </div>
-
-    <div style="height:12px;"></div>
-    <div class="card">
-      <div style="font-weight:800;">Period Summary</div>
-      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div>
-    </div>
+  <div class="summary-card" style="margin-top: 30px;">
+    <h2>Category Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th class="text-right">Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${catSummaryRows}
+      </tbody>
+    </table>
   </div>
 </body>
 </html>`;
 
     const w = window.open('', '_blank');
-    if (!w) return;
+    if (!w) {
+      alert('Unable to open print window — please allow popups.');
+      return;
+    }
     w.document.open();
     w.document.write(html);
     w.document.close();
