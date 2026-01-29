@@ -48,6 +48,17 @@ function downloadText(filename, text, mime = 'text/plain;charset=utf-8') {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Normalizes a string to Title Case and handles empty/null values.
+ * @param {string} str The input string.
+ * @returns {string} The formatted string.
+ */
+function toTitleCase(str) {
+  if (!str || typeof str !== 'string') return '';
+  // This regex handles words separated by spaces and converts them to Title Case.
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+}
+
 export default function ReportsImport() {
   const { funders: rawFunders, projects: rawProjects, expenses: rawExpenses, addExpense, updateExpense } = useFinance();
   const { role, currency: orgCurrency } = useOrg();
@@ -131,19 +142,36 @@ export default function ReportsImport() {
   }, [reportTx, selectedPeriod, reportType]);
 
   const grouped = useMemo(() => {
-    const groups = groupTransactionsCategoryPayee(periodTx);
-    // Ensure all categories from the full import are represented, even if zero for this period
+    const groups = groupTransactionsCategoryPayee(periodTx); // This groups transactions from the current period.
+
+    // To match the original file's category order, we derive the order from the full, unsorted `reportTx`.
+    const allCategoriesInOrder = [];
     if (reportTx && reportTx.length > 0) {
-      const allCats = new Set(reportTx.map(t => String(t.category || '').trim()).filter(c => c));
-      const present = new Set(groups.map(g => g.categoryName));
-      for (const cat of allCats) {
-        if (!present.has(cat)) {
-          groups.push({ categoryName: cat, categoryTotal: 0, payees: [] });
+      const seenCategories = new Set();
+      for (const tx of reportTx) {
+        const cat = String(tx.category || '').trim();
+        if (cat && !seenCategories.has(cat)) {
+          seenCategories.add(cat);
+          allCategoriesInOrder.push(cat);
         }
       }
-      // Sort by category name
-      groups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
     }
+
+    // Ensure all categories from the original import are represented in the final list, even if they have no transactions for the selected period.
+    const presentCategoryNames = new Set(groups.map(g => g.categoryName));
+    for (const catName of allCategoriesInOrder) {
+      if (!presentCategoryNames.has(catName)) {
+        groups.push({ categoryName: catName, categoryTotal: 0, payees: [] });
+      }
+    }
+
+    // Sort the final groups array to match the original file's category appearance order.
+    groups.sort((a, b) => {
+      const indexA = allCategoriesInOrder.indexOf(a.categoryName);
+      const indexB = allCategoriesInOrder.indexOf(b.categoryName);
+      return indexA - indexB;
+    });
+
     return groups;
   }, [periodTx, reportTx]);
 
@@ -1009,6 +1037,20 @@ export default function ReportsImport() {
     setReportErrors(normalized.errors || []);
     setReportWarnings(normalized.warnings || []);
     setReportTx(normalized.transactions || []);
+    const normalizedResult = normalizeImportedRowsToTransactions(rows, { defaultPaymentMethod: 'MPESA' });
+
+    // Normalize categories to handle inconsistencies (case, whitespace, empty).
+    // This prevents issues like 'Staffs' and 'staffs' being treated as different categories,
+    // and groups items with no category under 'Uncategorized'.
+    const transactions = (normalizedResult.transactions || []).map(t => {
+      const rawCategory = String(t.category || '').trim();
+      const category = toTitleCase(rawCategory) || 'Uncategorized';
+      return { ...t, category };
+    });
+
+    setReportErrors(normalizedResult.errors || []);
+    setReportWarnings(normalizedResult.warnings || []);
+    setReportTx(transactions);
     setReportType('all');
   };
 
@@ -1067,8 +1109,7 @@ export default function ReportsImport() {
 
     const body = grouped.map((c) => {
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
-      allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
-
+      
       const txRows = allCategoryTx.map((t) => `
           <tr>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
@@ -1207,8 +1248,7 @@ export default function ReportsImport() {
 
     const body = grouped.map((c) => {
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
-      allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
-
+      
       const txRows = allCategoryTx.map((t) => `
           <tr>
             <td>${esc(t.payeeName)}</td>
@@ -1489,8 +1529,7 @@ export default function ReportsImport() {
 
     const breakdownXml = groupedWithRefs.map((c) => {
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
-      allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
-
+      
       const txRows = allCategoryTx.map((t) => `
           <w:tr>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
