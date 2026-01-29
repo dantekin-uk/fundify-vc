@@ -245,7 +245,7 @@ export function filterByPeriod(transactions, period) {
     const m = Number(period.month); // 1-12
     return transactions.filter((t) => {
       const d = t.dateOfPayment;
-      if (!(d instanceof Date) || isNaN(d.getTime())) return false;
+      if (!(d instanceof Date) || isNaN(d.getTime())) return true;
       return d.getFullYear() === y && (d.getMonth() + 1) === m;
     });
   }
@@ -335,9 +335,6 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     // allow zero/negative amounts to be included (refunds/adjustments)
     // Keep category and payee empty if not provided
 
-    if (!payeeName && description) {
-      payeeName = description;
-    }
     const isMpesa = paymentMethod.toUpperCase() === 'MPESA' || paymentMethod.toUpperCase() === 'M-PESA';
     let referenceCode = referenceCodeRaw;
     if (isMpesa) {
