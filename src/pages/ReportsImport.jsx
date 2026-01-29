@@ -177,7 +177,8 @@ export default function ReportsImport() {
       const formatOpts = { month: 'long', year: 'numeric' };
       const start = minDate.toLocaleDateString('en-US', formatOpts);
       const end = maxDate.toLocaleDateString('en-US', formatOpts);
-      return start === end ? start : `${start} - ${end}`;
+      // If the start and end month are the same, show that month. Otherwise, just show the end month to avoid a range.
+      return start === end ? start : end;
     }
     if (reportType === 'monthly') {
       const [yy, mm] = String(reportMonth || '').split('-');
@@ -1139,6 +1140,23 @@ export default function ReportsImport() {
     setReportWarnings(normalizedResult.warnings || []);
     setReportTx(transactions);
     setReportType('all');
+
+    // Auto-detect date range from imported transactions to set default report filters
+    if (transactions.length > 0) {
+      const validDates = transactions
+        .map(t => t.dateOfPayment ? new Date(t.dateOfPayment) : null)
+        .filter(d => d && !isNaN(d.getTime()));
+      
+      if (validDates.length > 0) {
+        const minTime = Math.min(...validDates.map(d => d.getTime()));
+        const d = new Date(minTime);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        setReportMonth(`${yyyy}-${mm}`);
+        setReportYear(String(yyyy));
+        setReportQuarter(String(Math.floor(d.getMonth() / 3) + 1));
+      }
+    }
   };
 
   const reportPreview = useMemo(() => {
@@ -1171,7 +1189,6 @@ export default function ReportsImport() {
   };
 
   const exportHierarchyHTML = () => {
-    const generated = new Date().toLocaleString();
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
       : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
@@ -1256,7 +1273,6 @@ export default function ReportsImport() {
           <div style="font-weight:800;font-size:16px;margin-top:4px;">${esc(title)}</div>
           <div class="muted" style="margin-top:4px;">Reporting Period: ${esc(periodLabel)}</div>
         </div>
-        <div class="muted">Date Generated: ${esc(generated)}</div>
       </div>
     </div>
 
@@ -1309,7 +1325,6 @@ export default function ReportsImport() {
   const exportHierarchyPDF = () => {
     if (!periodTx.length) return;
     // "PDF export" via print dialog (Save as PDF)
-    const generated = new Date().toLocaleString();
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
       : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
@@ -1499,7 +1514,7 @@ export default function ReportsImport() {
     <div class="org-name">NAPTA</div>
     <h1>${esc(title)}</h1>
     <div class="meta-info">
-      Period: ${esc(periodLabel)} | Generated: ${esc(generated)}
+      Period: ${esc(periodLabel)}
     </div>
   </div>
 
@@ -1562,7 +1577,6 @@ export default function ReportsImport() {
 
   const exportHierarchyWord = () => {
     if (!periodTx.length) return;
-    const generatedDate = new Date().toLocaleString();
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
       : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
@@ -1672,7 +1686,7 @@ export default function ReportsImport() {
     <w:sect>
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="30"/></w:rPr><w:t>Organization Name: NAPTA</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${escapeXml(title)}</w:t></w:r></w:p>
-      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period: ${escapeXml(periodLabel)} | Date Generated: ${escapeXml(generatedDate)}</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period: ${escapeXml(periodLabel)}</w:t></w:r></w:p>
 
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Executive Summary</w:t></w:r></w:p>
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))} KSH</w:t></w:r></w:p>
