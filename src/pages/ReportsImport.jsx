@@ -1383,7 +1383,7 @@ export default function ReportsImport() {
   };
 
   const exportHierarchyPDF = () => {
-    if (!periodTx.length) return;
+    if (!periodTx.length && !reportTx.length) return;
     // "PDF export" via print dialog (Save as PDF)
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
@@ -1399,7 +1399,7 @@ export default function ReportsImport() {
 
     // Generate automatic M-Pesa references for missing ones (starting with T)
     const usedRefs = new Set();
-    const transactionsWithRefs = periodTx.map((t) => {
+    const transactionsWithRefs = (periodTx.length ? periodTx : reportTx).map((t) => {
       let refCode = t.referenceCode || '';
       const isMpesa = (t.paymentMethod || '').toUpperCase().includes('MPESA') || 
                       (t.paymentMethod || '').toUpperCase().includes('M-PESA') ||
@@ -1723,18 +1723,43 @@ export default function ReportsImport() {
 </html>`;
 
     const w = window.open('', '_blank');
-    if (!w) {
-      alert('Unable to open print window — please allow popups.');
-      return;
+    if (w) {
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      w.document.title = filename;
+      setTimeout(() => {
+        try { w.focus(); w.print(); } catch {}
+      }, 400);
+    } else {
+      try {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        iframe.src = url;
+        iframe.onload = () => {
+          try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          } finally {
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+              document.body.removeChild(iframe);
+            }, 800);
+          }
+        };
+      } catch (e) {
+        // Final fallback: download HTML for manual print
+        downloadText(`NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.html`, html, 'text/html;charset=utf-8');
+      }
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    w.document.title = filename;
-    // Give the browser a moment to render before printing
-    setTimeout(() => {
-      try { w.focus(); w.print(); } catch {}
-    }, 400);
   };
 
   const exportHierarchyWord = () => {
