@@ -1795,7 +1795,6 @@ export default function ReportsImport() {
       
       const txRows = allCategoryTx.map((t) => `
           <w:tr>
-            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.payeeName || '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
@@ -1983,21 +1982,21 @@ export default function ReportsImport() {
             <div className="md:col-span-5 flex flex-wrap items-center gap-3">
               <button
                 onClick={exportHierarchyHTML}
-                disabled={reportTx.length === 0}
+                disabled={periodTx.length === 0}
                 className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm disabled:opacity-50 dark:bg-sky-500"
               >
                 Export Report (HTML)
               </button>
               <button
                 onClick={exportHierarchyPDF}
-                disabled={reportTx.length === 0}
+                disabled={periodTx.length === 0}
                 className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
               >
                 Export PDF
               </button>
               <button
                 onClick={exportHierarchyWord}
-                disabled={reportTx.length === 0}
+                disabled={periodTx.length === 0}
                 className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50 dark:bg-indigo-500"
               >
                 Export Word
@@ -2012,6 +2011,7 @@ export default function ReportsImport() {
                                    (t.paymentMethod || '').toUpperCase() === 'M-PESA' ||
                                    !t.paymentMethod; // Default to MPESA if no method specified
                     if (isMpesa && !refCode) {
+                      refCode = genReferenceCode(usedRefs);
                       refCode = generateLocalMpesaCode(usedRefs);
                       usedRefs.add(refCode);
                     }
