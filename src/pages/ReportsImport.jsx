@@ -2026,6 +2026,13 @@ export default function ReportsImport() {
                 Export PDF
               </button>
               <button
+                onClick={exportHierarchyPDF}
+                disabled={periodTx.length === 0}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50 dark:bg-emerald-500"
+              >
+                Print
+              </button>
+              <button
                 onClick={exportHierarchyWord}
                 disabled={periodTx.length === 0}
                 className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50 dark:bg-indigo-500"
