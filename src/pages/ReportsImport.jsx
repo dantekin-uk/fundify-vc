@@ -2514,11 +2514,11 @@ export default function ReportsImport() {
 
       .replace(/</g, '&lt;')
 
-      .replace(/>/g, '&gt;')
-
-      .replace(/"/g, '&quot;')
-
-      .replace(/'/g, '&#039;');
+    const displayAmount = (v) => {
+      const n = Number(v);
+      if (!isFinite(n) || n === 0) return '';
+      return `${esc(formatAmount(n, 'KES'))} KSH`;
+    };
 
 
 
@@ -2857,36 +2857,45 @@ export default function ReportsImport() {
       return groups.map((c) => {
 
         const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
+        allCategoryTx.sort((a, b) => {
+          const aT = a.dateOfPayment?.getTime?.() ?? (a.dateOfPayment ? new Date(a.dateOfPayment).getTime() : 0);
+          const bT = b.dateOfPayment?.getTime?.() ?? (b.dateOfPayment ? new Date(b.dateOfPayment).getTime() : 0);
+          return aT - bT;
+        });
 
-        // Sort by date within category
+        const txRows = allCategoryTx
+          .filter((t) => {
+            const d = t.dateOfPayment ? new Date(t.dateOfPayment) : null;
+            const hasDate = d && !isNaN(d.getTime());
+            const hasDesc = String(t.description || '').trim() !== '';
+            const hasPayee = String(t.payeeName || '').trim() !== '';
+            const n = Number(t.amount);
+            const hasAmount = isFinite(n) && n !== 0;
+            return hasDate || hasDesc || hasPayee || hasAmount;
+          })
+          .map((t) => {
+            const d = t.dateOfPayment ? (t.dateOfPayment instanceof Date ? t.dateOfPayment : new Date(t.dateOfPayment)) : null;
+            const dateCell = d && !isNaN(d.getTime()) ? d.toLocaleDateString() : '';
+            const payeeCell = String(t.payeeName || '').trim();
+            const expCell = String(t.description || '').trim();
+            const methodCell = String(t.paymentMethod || '').trim();
+            const refCell = String(t.referenceCode || '').trim();
+            const amountCell = displayAmount(t.amount);
+            return `
+              <tr>
+                <td>${esc(dateCell)}</td>
+                <td>${esc(payeeCell)}</td>
+                <td>${esc(expCell)}</td>
+                <td class="text-right">${amountCell}</td>
+                <td>${esc(methodCell)}</td>
+                <td>${esc(refCell)}</td>
+              </tr>
+            `;
+          })
 
-        allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
-
-        
-
-        const txRows = allCategoryTx.map((t) => `
-
-            <tr>
-
-              <td>${esc(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</td>
-
-              <td>${esc(t.payeeName)}</td>
-
-              <td>${esc(t.description)}</td>
-
-              <td class="text-right">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
-
-              <td>${esc(t.paymentMethod || '')}</td>
-
-              <td class="font-mono">${esc(t.referenceCode || '')}</td>
-
-            </tr>
-
-          `).join('');
 
 
-
-        const rowsHtml = txRows || `<tr><td colspan="6" class="no-transactions">No transactions for this category</td></tr>`;
+        const rowsHtml = txRows.length ? txRows.join('') : `<tr><td colspan="6" class="no-transactions">No transactions for this category</td></tr>`;
 
 
 
@@ -2973,30 +2982,39 @@ export default function ReportsImport() {
 
 
       body = sortedMonths.map((monthKey) => {
-
         const monthDate = new Date(monthKey + '-01');
-
+        const monthTotal = (byMonth[monthKey] || []).reduce((sum, t) => {
+          const n = Number(t.amount);
+          return sum + (isFinite(n) ? n : 0);
+        }, 0);
+        const monthName = isNaN(monthDate.getTime()) ? '' : monthDate.toLocaleDateString('default', { month: 'long' });
         const monthLabel = isNaN(monthDate.getTime()) ? 'Unknown Date' : monthDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
 
         const monthContent = generateCategoryBlocks(byMonth[monthKey]);
 
-
-
         return `
-
-          <div style="margin-top: 40px; page-break-inside: avoid;">
-
-            <h2 style="border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 20px; color: #1e293b; font-size: 16pt;">${esc(monthLabel)}</h2>
-
+          <div class="card" style="margin-top: 8px;">
+            <div style="font-weight:800;">${esc(monthLabel)}</div>
             ${monthContent}
-
+            <div class="summary-card" style="margin-top: 10px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th class="text-right">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>${esc(monthName ? `Total ${monthName}` : 'Total')}</td>
+                    <td class="text-right">${displayAmount(monthTotal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-
         `;
-
       }).join('');
-
-
 
       // For summary table, we still want total per category across all months
 
@@ -3856,6 +3874,105 @@ export default function ReportsImport() {
 
   };
 
+  const exportFilteredCSV = () => {
+    if (!periodTx.length) return;
+    const usedRefs = new Set();
+    const transactionsWithRefs = periodTx.map((t) => {
+      let refCode = t.referenceCode || '';
+      const isMpesa =
+        (t.paymentMethod || '').toUpperCase() === 'MPESA' ||
+        (t.paymentMethod || '').toUpperCase() === 'M-PESA' ||
+        !t.paymentMethod;
+      if (isMpesa && !refCode) {
+        refCode = generateLocalMpesaCode(usedRefs);
+        usedRefs.add(refCode);
+      }
+      const amt = Number(t.amount);
+      return {
+        category: t.category || '',
+        payeeName: t.payeeName || '',
+        expenditure: t.description || '',
+        amount: isFinite(amt) && amt !== 0 ? Math.round(amt) : '',
+        dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
+        mpesaNumber: refCode || '',
+      };
+    });
+
+    const groupedByCategory = {};
+    transactionsWithRefs.forEach((t) => {
+      const catKey = t.category || '';
+      if (!groupedByCategory[catKey]) groupedByCategory[catKey] = [];
+      groupedByCategory[catKey].push(t);
+    });
+
+    const organizedRows = [];
+    Object.keys(groupedByCategory)
+      .sort()
+      .forEach((category) => {
+        if (category && category.trim() !== '') {
+          organizedRows.push({
+            category,
+            payeeName: '',
+            expenditure: '',
+            amount: '',
+            dateOfPayment: '',
+            mpesaNumber: '',
+          });
+        }
+        groupedByCategory[category].forEach((t) => {
+          organizedRows.push(t);
+        });
+        if (category && category.trim() !== '') {
+          organizedRows.push({
+            category: '',
+            payeeName: '',
+            expenditure: '',
+            amount: '',
+            dateOfPayment: '',
+            mpesaNumber: '',
+          });
+        }
+      });
+
+    const byMonth = {};
+    transactionsWithRefs.forEach((t) => {
+      const d = t.dateOfPayment ? new Date(t.dateOfPayment) : null;
+      if (!d || isNaN(d.getTime())) return;
+      const key = d.toISOString().slice(0, 7);
+      if (!byMonth[key]) byMonth[key] = 0;
+      const n = typeof t.amount === 'number' ? t.amount : Number(t.amount);
+      byMonth[key] += isFinite(n) ? n : 0;
+    });
+    const monthKeys = Object.keys(byMonth).sort();
+    let grandTotal = 0;
+    monthKeys.forEach((key) => {
+      const monthDate = new Date(key + '-01');
+      const monthName = isNaN(monthDate.getTime())
+        ? key
+        : monthDate.toLocaleDateString('default', { month: 'long' });
+      const total = byMonth[key];
+      grandTotal += total;
+      organizedRows.push({
+        category: `Total ${monthName}`,
+        payeeName: '',
+        expenditure: '',
+        amount: total ? Math.round(total) : '',
+        dateOfPayment: '',
+        mpesaNumber: '',
+      });
+    });
+    organizedRows.push({
+      category: 'Total Year',
+      payeeName: '',
+      expenditure: '',
+      amount: grandTotal ? Math.round(grandTotal) : '',
+      dateOfPayment: '',
+      mpesaNumber: '',
+    });
+
+    downloadCSV('transactions_filtered.csv', organizedRows);
+  };
+
 
 
   return (
@@ -4083,147 +4200,11 @@ export default function ReportsImport() {
               </button>
 
               <button
-
-                onClick={() => {
-
-                  // Generate automatic M-Pesa references for missing ones
-
-                  const usedRefs = new Set();
-
-                  const transactionsWithRefs = periodTx.map((t) => {
-
-                    let refCode = t.referenceCode || '';
-
-                    const isMpesa = (t.paymentMethod || '').toUpperCase() === 'MPESA' || 
-
-                                   (t.paymentMethod || '').toUpperCase() === 'M-PESA' ||
-
-                                   !t.paymentMethod; // Default to MPESA if no method specified
-
-                    if (isMpesa && !refCode) {
-
-                      refCode = genReferenceCode(usedRefs);
-
-                      refCode = generateLocalMpesaCode(usedRefs);
-
-                      usedRefs.add(refCode);
-
-                    }
-
-                    return {
-
-                      category: t.category || '', // Keep empty if no category
-
-                      payeeName: t.payeeName || '', // Keep empty if no payee
-
-                      expenditure: t.description || '', // Expenditure column (description)
-
-                      amount: t.amount || 0,
-
-                      dateOfPayment: t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '',
-
-                      mpesaNumber: t.referenceCode || '', // M-Pesa number (existing reference code)
-
-                    };
-
-                  });
-
-                  
-
-                  // Group by category for organized CSV
-
-                  const groupedByCategory = {};
-
-                  transactionsWithRefs.forEach(t => {
-
-                    const catKey = t.category || ''; // Keep empty if no category
-
-                    if (!groupedByCategory[catKey]) {
-
-                      groupedByCategory[catKey] = [];
-
-                    }
-
-                    groupedByCategory[catKey].push(t);
-
-                  });
-
-                  
-
-                  // Create organized CSV with category groups
-
-                  const organizedRows = [];
-
-                  Object.keys(groupedByCategory).sort().forEach(category => {
-
-                    // Add category header only if category exists and is not empty
-
-                    if (category && category.trim() !== '') {
-
-                      organizedRows.push({
-
-                        category: category,
-
-                        payeeName: '',
-
-                        expenditure: '',
-
-                        amount: '',
-
-                        dateOfPayment: '',
-
-                        mpesaNumber: '',
-
-                      });
-
-                    }
-
-                    // Add transactions for this category
-
-                    groupedByCategory[category].forEach(t => {
-
-                      organizedRows.push(t);
-
-                    });
-
-                    // Add empty row for separation only if there was a category
-
-                    if (category && category.trim() !== '') {
-
-                      organizedRows.push({
-
-                        category: '',
-
-                        payeeName: '',
-
-                        expenditure: '',
-
-                        amount: '',
-
-                        dateOfPayment: '',
-
-                        mpesaNumber: '',
-
-                      });
-
-                    }
-
-                  });
-
-                  
-
-                  downloadCSV('transactions_filtered.csv', organizedRows);
-
-                }}
-
+                onClick={exportFilteredCSV}
                 disabled={periodTx.length === 0}
-
                 className="text-sm font-medium text-slate-700 hover:underline disabled:opacity-50 dark:text-slate-200"
-
               >
-
                 Export Filtered CSV
-
               </button>
 
               <div className="text-xs text-slate-500 dark:text-slate-400">
