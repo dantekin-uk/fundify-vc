@@ -118,6 +118,30 @@ function generateLocalMpesaCode(existingSet) {
   return code;
 }
 
+function hashString(s) {
+  let h = 0;
+  const str = String(s || '');
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function randomWeekdayDate(year, month, seed) {
+  const y = Number(year);
+  const m = Number(month);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return null;
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const weekdays = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const wd = new Date(y, m - 1, d).getDay();
+    if (wd >= 1 && wd <= 5) weekdays.push(d);
+  }
+  if (!weekdays.length) return new Date(y, m - 1, 1);
+  const idx = hashString(seed) % weekdays.length;
+  return new Date(y, m - 1, weekdays[idx]);
+}
+
 export default function ReportsImport() {
   const { funders: rawFunders, projects: rawProjects, expenses: rawExpenses, addExpense, updateExpense } = useFinance();
   const { role, currency: orgCurrency } = useOrg();
@@ -219,8 +243,16 @@ export default function ReportsImport() {
 
   const periodTx = useMemo(() => {
     const filtered = filterByPeriod(reportTx || [], selectedPeriod);
-    // derive reportingPeriod field
-    return filtered.map((t) => ({ ...t, category: String(t.category || '').trim(), reportingPeriod: deriveReportingPeriod(t.dateOfPayment, reportType) }));
+    return filtered.map((t) => {
+      let d = t.dateOfPayment instanceof Date ? t.dateOfPayment : (t.dateOfPayment ? new Date(t.dateOfPayment) : null);
+      if ((reportType === 'monthly') && (d == null || isNaN(d?.getTime?.()))) {
+        const y = selectedPeriod?.year;
+        const m = selectedPeriod?.month;
+        const seeded = randomWeekdayDate(y, m, t.transactionId || `${t.payeeName || ''}${t.amount || 0}`);
+        if (seeded && !isNaN(seeded.getTime())) d = seeded;
+      }
+      return { ...t, dateOfPayment: d, category: String(t.category || '').trim(), reportingPeriod: deriveReportingPeriod(d, reportType) };
+    });
   }, [reportTx, selectedPeriod, reportType]);
 
   const grouped = useMemo(() => {
@@ -1243,6 +1275,7 @@ export default function ReportsImport() {
       const txRows = allCategoryTx.map((t) => `
           <tr>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.payeeName)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
@@ -1380,7 +1413,10 @@ export default function ReportsImport() {
     });
 
     // Determine if we should group by month (Yearly, Quarterly, All)
-    const uniqueMonths = new Set(transactionsWithRefs.map(t => t.dateOfPayment ? t.dateOfPayment.toISOString().slice(0, 7) : ''));
+    const uniqueMonths = new Set(transactionsWithRefs.map(t => {
+      const d = t.dateOfPayment ? new Date(t.dateOfPayment) : null;
+      return (d && !isNaN(d.getTime())) ? d.toISOString().slice(0, 7) : '';
+    }));
     const isMultiMonth = uniqueMonths.size > 1 && (reportType === 'yearly' || reportType === 'all' || reportType === 'quarterly');
 
     // Helper to generate category HTML blocks
@@ -1397,6 +1433,7 @@ export default function ReportsImport() {
         const txRows = allCategoryTx.map((t) => `
             <tr>
               <td>${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
+              <td>${esc(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</td>
               <td>${esc(t.payeeName)}</td>
               <td>${esc(t.description)}</td>
               <td class="text-right">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
@@ -1719,8 +1756,8 @@ export default function ReportsImport() {
     const usedRefs = new Set();
     const transactionsWithRefs = periodTx.map((t) => {
       let refCode = t.referenceCode || '';
-      const isMpesa = (t.paymentMethod || '').toUpperCase() === 'MPESA' || 
-                     (t.paymentMethod || '').toUpperCase() === 'M-PESA' ||
+      const isMpesa = (t.paymentMethod || '').toUpperCase().includes('MPESA') || 
+                     (t.paymentMethod || '').toUpperCase().includes('M-PESA') ||
                      !t.paymentMethod; // Default to MPESA if no method specified
       if (isMpesa && !refCode) {
         refCode = generateLocalMpesaCode(usedRefs);
@@ -1761,6 +1798,7 @@ export default function ReportsImport() {
       const txRows = allCategoryTx.map((t) => `
           <w:tr>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.payeeName || '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
             <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
@@ -1897,6 +1935,20 @@ export default function ReportsImport() {
                   Download example file
                 </button>
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Organization Logo (PNG/JPG)</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="w-full text-sm text-slate-700 dark:text-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-200 dark:hover:file:bg-slate-700"
+                onChange={handleLogoUpload}
+              />
+              {orgLogo && (
+                <div className="mt-2">
+                  <img src={orgLogo} alt="Logo preview" className="h-10 object-contain" />
+                </div>
+              )}
             </div>
 
             <div>

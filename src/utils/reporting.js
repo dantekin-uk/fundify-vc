@@ -113,11 +113,11 @@ export function genReferenceCode(existingSet) {
   const digits = '0123456789';
   const chars = alphabet + digits;
   for (let attempt = 0; attempt < 50; attempt++) {
-    let code = '';
-    for (let i = 0; i < 10; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    let code = 'T';
+    for (let i = 0; i < 9; i++) code += chars[Math.floor(Math.random() * chars.length)];
     if (!existingSet || !existingSet.has(code)) return code;
   }
-  let fallback = 'MP' + Date.now().toString(36).toUpperCase().slice(-8);
+  let fallback = 'T' + Date.now().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, 'X').slice(-9);
   fallback = fallback.replace(/[^A-Z0-9]/g, 'X').slice(0, 10).padEnd(10, 'X');
   return fallback;
 }
