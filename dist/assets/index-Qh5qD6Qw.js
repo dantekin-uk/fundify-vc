@@ -4642,7 +4642,6 @@ You've been invited to join ${oe.organization} as a ${oe.role}. Click the button
     }
     .category-section {
       margin-top: 30px;
-      page-break-inside: avoid;
     }
     .category-header {
       display: flex;
@@ -4653,6 +4652,7 @@ You've been invited to join ${oe.organization} as a ${oe.role}. Click the button
       border-radius: 6px 6px 0 0;
       border: 1px solid #e2e8f0;
       border-bottom: none;
+      page-break-after: avoid;
     }
     .category-header h3 {
       font-size: 13pt;
@@ -4668,6 +4668,10 @@ You've been invited to join ${oe.organization} as a ${oe.role}. Click the button
       width: 100%;
       border-collapse: collapse;
       border: 1px solid #e2e8f0;
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
     }
     thead th {
       background-color: #2d3748;
@@ -4689,6 +4693,9 @@ You've been invited to join ${oe.organization} as a ${oe.role}. Click the button
     }
     tbody tr:nth-child(even) {
       background-color: #f7fafc;
+    }
+    tbody tr {
+      page-break-inside: avoid;
     }
     .text-right { text-align: right; }
     .font-mono { font-family: 'Courier New', Courier, monospace; }
