@@ -1380,7 +1380,7 @@ export default function ReportsImport() {
 
             <w:tcPr><w:tcW w:w="1800" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tcBorders></w:tcPr>
 
-            <w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(formatAmount(r.amount || 0, 'KES'))} KSH</w:t></w:r></w:p>
+            <w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(formatAmount(r.amount || 0, 'KES'))}</w:t></w:r></w:p>
 
           </w:tc>
 
@@ -1446,7 +1446,7 @@ export default function ReportsImport() {
 
             <w:rPr><w:sz w:val="20"/><w:color w:val="6b7280"/></w:rPr>
 
-            <w:t>Subtotal: ${escapeXml(formatAmount(subtotal, 'KES'))} KSH • Transactions: ${rows.length}</w:t>
+            <w:t>Subtotal: ${escapeXml(formatAmount(subtotal, 'KES'))} • Transactions: ${rows.length}</w:t>
 
           </w:r>
 
@@ -1582,7 +1582,7 @@ export default function ReportsImport() {
 
           </w:rPr>
 
-          <w:t>Total Amount: ${escapeXml(formatAmount(totalAmount, 'KES'))} KSH</w:t>
+          <w:t>Total Amount: ${escapeXml(formatAmount(totalAmount, 'KES'))}</w:t>
 
         </w:r>
 
@@ -2504,7 +2504,7 @@ export default function ReportsImport() {
 
       ? 'Monthly Expenditure Report'
 
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report (Tranch 1 and Tranch 2)' : 'Expenditure Report'));
 
 
 
@@ -2520,7 +2520,7 @@ export default function ReportsImport() {
     const displayAmount = (v) => {
       const n = Number(v);
       if (!isFinite(n) || n === 0) return '';
-      return `${esc(formatAmount(n, 'KES'))} KSH`;
+      return formatAmount(n, 'KES');
     };
     const catSummaryRows = grouped.map((c) => `
 
@@ -2528,7 +2528,7 @@ export default function ReportsImport() {
 
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${esc(c.categoryName)}</td>
 
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;">${esc(formatAmount(c.categoryTotal, 'KES'))}</td>
 
       </tr>
 
@@ -2536,7 +2536,7 @@ export default function ReportsImport() {
 
 
 
-    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
+    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')}.`;
 
 
 
@@ -2556,7 +2556,7 @@ export default function ReportsImport() {
 
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
 
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))}</td>
 
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
 
@@ -2580,7 +2580,7 @@ export default function ReportsImport() {
 
             <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
 
-            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
+            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))}</div>
 
           </div>
 
@@ -2682,7 +2682,7 @@ export default function ReportsImport() {
 
       <div class="grid" style="margin-top:10px;">
 
-        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div></div>
+        <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))}</div></div>
 
         <div><div class="muted">Number of Categories</div><div style="font-weight:800;">${esc(execSummary.numberOfCategories)}</div></div>
 
@@ -2748,7 +2748,7 @@ export default function ReportsImport() {
 
       <div style="font-weight:800;">Period Summary</div>
 
-      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div>
+      <div class="muted" style="margin-top:6px;">${esc(periodLabel)} total: ${esc(formatAmount(execSummary.totalExpenditure, 'KES'))}</div>
 
     </div>
 
@@ -2780,7 +2780,7 @@ export default function ReportsImport() {
 
       ? 'Monthly Expenditure Report'
 
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report (Tranch 1 and Tranch 2)' : 'Expenditure Report'));
 
     const filename = `NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.pdf`;
 
@@ -2796,7 +2796,7 @@ export default function ReportsImport() {
     const displayAmount = (v) => {
       const n = Number(v);
       if (!isFinite(n) || n === 0) return '';
-      return `${esc(formatAmount(n, 'KES'))} KSH`;
+      return formatAmount(n, 'KES');
     };
 
 
@@ -2908,7 +2908,7 @@ export default function ReportsImport() {
 
               <h3>Category: ${esc(c.categoryName)}</h3>
 
-              <div class="total">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
+              <div class="total">${esc(formatAmount(c.categoryTotal, 'KES'))}</div>
 
             </div>
 
@@ -3029,7 +3029,7 @@ export default function ReportsImport() {
 
           <td>${esc(c.categoryName)}</td>
 
-          <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
+          <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))}</td>
 
         </tr>
 
@@ -3055,7 +3055,7 @@ export default function ReportsImport() {
 
         <td>${esc(c.categoryName)}</td>
 
-        <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
+        <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))}</td>
 
       </tr>
 
@@ -3065,7 +3065,7 @@ export default function ReportsImport() {
 
 
 
-    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
+    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')}.`;
 
 
 
@@ -3387,7 +3387,7 @@ export default function ReportsImport() {
 
         <div class="label">Total Expenditure</div>
 
-        <div class="value">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))} KSH</div>
+        <div class="value">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))}</div>
 
       </div>
 
@@ -3567,7 +3567,7 @@ export default function ReportsImport() {
 
       ? 'Monthly Expenditure Report'
 
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report (Tranch 1 and Tranch 2)' : 'Expenditure Report'));
 
 
 
@@ -3643,7 +3643,7 @@ export default function ReportsImport() {
 
 
 
-    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
+    const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')}.`;
 
 
 
@@ -3657,7 +3657,7 @@ export default function ReportsImport() {
 
         <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName)}</w:t></w:r></w:p></w:tc>
 
-        <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(c.categoryTotal, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(c.categoryTotal, 'KES'))}</w:t></w:r></w:p></w:tc>
 
       </w:tr>
 
@@ -3681,7 +3681,7 @@ export default function ReportsImport() {
 
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
 
-            <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))} KSH</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))}</w:t></w:r></w:p></w:tc>
 
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.paymentMethod || '')}</w:t></w:r></w:p></w:tc>
 
@@ -3707,7 +3707,7 @@ export default function ReportsImport() {
 
       return `
 
-        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal, 'KES'))} KSH)</w:t></w:r></w:p>
+        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal, 'KES'))})</w:t></w:r></w:p>
 
           <w:tbl>
 
@@ -3787,7 +3787,7 @@ export default function ReportsImport() {
 
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Executive Summary</w:t></w:r></w:p>
 
-      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))} KSH</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))}</w:t></w:r></w:p>
 
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Number of Categories: ${escapeXml(execSummary.numberOfCategories || 0)}</w:t></w:r></w:p>
 
@@ -3845,7 +3845,7 @@ export default function ReportsImport() {
 
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Period Summary</w:t></w:r></w:p>
 
-      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(periodLabel)} total: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))} KSH</w:t></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(periodLabel)} total: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))}</w:t></w:r></w:p>
 
     </w:sect>
 
