@@ -330,6 +330,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
   const out = [];
   let warnInvalidDate = 0;
   let warnInvalidAmount = 0;
+  let skippedEmptyRows = 0;
   let lastCategory = '';
   for (let idx = 0; idx < rows.length; idx++) {
     const r = rows[idx] || {};
@@ -344,6 +345,13 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     const projectName = String(pick(r, ['projectName', 'project_name', 'project']) ?? '').trim();
     const transactionIdRaw = String(pick(r, ['transactionId', 'transaction_id', 'id']) ?? '').trim();
     const phoneNumberRaw = String(pick(r, ['phoneNumber', 'phone_number', 'msisdn', 'phone']) ?? '').trim();
+
+    // Skip completely empty rows (no meaningful data)
+    const hasAnyData = date || Number.isFinite(amount) || category || payeeName || description || referenceCodeRaw || projectName || transactionIdRaw || phoneNumberRaw;
+    if (!hasAnyData) {
+      skippedEmptyRows++;
+      continue; // Skip this row entirely
+    }
 
     if (!date || isNaN(date.getTime())) { 
       warnInvalidDate++; 
@@ -394,6 +402,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
 
   if (warnInvalidDate > 0) warnings.push(`${warnInvalidDate} row(s) have invalid/missing dates and were included with empty dates.`);
   if (warnInvalidAmount > 0) warnings.push(`${warnInvalidAmount} row(s) have invalid/missing amounts and were included as 0.`);
+  if (skippedEmptyRows > 0) warnings.push(`${skippedEmptyRows} empty row(s) were skipped and will not appear in reports.`);
   if (!out.length) errors.push('No transactions found.');
   return { transactions: out, errors, warnings };
 }
