@@ -1365,55 +1365,126 @@ export default function ReportsImport() {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
 
-    const catSummaryRows = grouped.map((c) => `
+    // Generate automatic M-Pesa references for missing ones (starting with T)
+    const usedRefs = new Set();
+    const transactionsWithRefs = periodTx.map((t) => {
+      let refCode = t.referenceCode || '';
+      const isMpesa = (t.paymentMethod || '').toUpperCase().includes('MPESA') || 
+                      (t.paymentMethod || '').toUpperCase().includes('M-PESA') ||
+                      !t.paymentMethod; // Default to MPESA if no method specified
+      if (isMpesa && !refCode) {
+        refCode = generateLocalMpesaCode(usedRefs);
+        usedRefs.add(refCode);
+      }
+      return { ...t, referenceCode: refCode };
+    });
+
+    // Determine if we should group by month (Yearly, Quarterly, All)
+    const uniqueMonths = new Set(transactionsWithRefs.map(t => t.dateOfPayment ? t.dateOfPayment.toISOString().slice(0, 7) : ''));
+    const isMultiMonth = uniqueMonths.size > 1 && (reportType === 'yearly' || reportType === 'all' || reportType === 'quarterly');
+
+    // Helper to generate category HTML blocks
+    const generateCategoryBlocks = (txList) => {
+      const groups = groupTransactionsCategoryPayee(txList);
+      // Sort categories alphabetically
+      groups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+
+      return groups.map((c) => {
+        const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
+        // Sort by date within category
+        allCategoryTx.sort((a, b) => new Date(a.dateOfPayment || 0) - new Date(b.dateOfPayment || 0));
+        
+        const txRows = allCategoryTx.map((t) => `
+            <tr>
+              <td>${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
+              <td>${esc(t.payeeName)}</td>
+              <td>${esc(t.description)}</td>
+              <td class="text-right">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
+              <td>${esc(t.paymentMethod || '')}</td>
+              <td class="font-mono">${esc(t.referenceCode || '')}</td>
+            </tr>
+          `).join('');
+
+        const rowsHtml = txRows || `<tr><td colspan="6" class="no-transactions">No transactions for this category</td></tr>`;
+
+        return `
+          <div class="category-section">
+            <div class="category-header">
+              <h3>Category: ${esc(c.categoryName)}</h3>
+              <div class="total">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
+            </div>
+            <table>
+              <thead style="background:#f8fafc;">
+                <tr>
+                  <th>Date</th>
+                  <th>Payee</th>
+                  <th>Expenditure</th>
+                  <th class="text-right">Amount</th>
+                  <th>Method</th>
+                  <th>M-Pesa Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join('');
+    };
+
+    let body = '';
+    let catSummaryRows = '';
+
+    if (isMultiMonth) {
+      // Group transactions by month
+      const byMonth = {};
+      transactionsWithRefs.forEach(t => {
+        const m = t.dateOfPayment ? t.dateOfPayment.toISOString().slice(0, 7) : 'Unknown';
+        if (!byMonth[m]) byMonth[m] = [];
+        byMonth[m].push(t);
+      });
+
+      const sortedMonths = Object.keys(byMonth).sort();
+
+      body = sortedMonths.map(m => {
+        const monthDate = new Date(m + '-01');
+        const monthLabel = isNaN(monthDate.getTime()) ? 'Unknown Date' : monthDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+        const monthContent = generateCategoryBlocks(byMonth[m]);
+
+        return `
+          <div style="margin-top: 40px; page-break-inside: avoid;">
+            <h2 style="border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 20px; color: #1e293b; font-size: 16pt;">${esc(monthLabel)}</h2>
+            ${monthContent}
+          </div>
+        `;
+      }).join('');
+
+      // For summary table, we still want total per category across all months
+      const totalGroups = groupTransactionsCategoryPayee(transactionsWithRefs);
+      totalGroups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+      catSummaryRows = totalGroups.map((c) => `
+        <tr>
+          <td>${esc(c.categoryName)}</td>
+          <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
+        </tr>
+      `).join('');
+
+    } else {
+      // Single month / standard view
+      body = generateCategoryBlocks(transactionsWithRefs);
+      
+      const totalGroups = groupTransactionsCategoryPayee(transactionsWithRefs);
+      totalGroups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+      catSummaryRows = totalGroups.map((c) => `
       <tr>
         <td>${esc(c.categoryName)}</td>
         <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</td>
       </tr>
     `).join('');
+    }
 
     const narrative = `Total expenditure is ${formatAmount(execSummary.totalExpenditure || 0, 'KES')} KSH.`;
-
-    const body = grouped.map((c) => {
-      const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
-      
-      const txRows = allCategoryTx.map((t) => `
-          <tr>
-            <td>${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
-            <td>${esc(t.payeeName)}</td>
-            <td>${esc(t.description)}</td>
-            <td class="text-right">${esc(formatAmount(t.amount, 'KES'))} KSH</td>
-            <td>${esc(t.paymentMethod || '')}</td>
-            <td class="font-mono">${esc(t.referenceCode || '')}</td>
-          </tr>
-        `).join('');
-
-      const rowsHtml = txRows || `<tr><td colspan="6" class="no-transactions">No transactions for this period</td></tr>`;
-
-      return `
-        <div class="category-section">
-          <div class="category-header">
-            <h3>Category: ${esc(c.categoryName)}</h3>
-            <div class="total">${esc(formatAmount(c.categoryTotal, 'KES'))} KSH</div>
-          </div>
-          <table>
-            <thead style="background:#f8fafc;">
-              <tr>
-                <th>Date</th>
-                <th>Payee</th>
-                <th>Expenditure</th>
-                <th class="text-right">Amount</th>
-                <th>Method</th>
-                <th>M-Pesa Reference</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-        </div>
-      `;
-    }).join('');
 
     const html = `<!DOCTYPE html>
 <html>
