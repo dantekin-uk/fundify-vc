@@ -1274,7 +1274,6 @@ export default function ReportsImport() {
       
       const txRows = allCategoryTx.map((t) => `
           <tr>
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.payeeName)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
@@ -1432,7 +1431,6 @@ export default function ReportsImport() {
         
         const txRows = allCategoryTx.map((t) => `
             <tr>
-              <td>${esc(t.dateOfPayment ? t.dateOfPayment.toLocaleDateString() : '')}</td>
               <td>${esc(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</td>
               <td>${esc(t.payeeName)}</td>
               <td>${esc(t.description)}</td>
@@ -1985,21 +1983,21 @@ export default function ReportsImport() {
             <div className="md:col-span-5 flex flex-wrap items-center gap-3">
               <button
                 onClick={exportHierarchyHTML}
-                disabled={periodTx.length === 0}
+                disabled={reportTx.length === 0}
                 className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm disabled:opacity-50 dark:bg-sky-500"
               >
                 Export Report (HTML)
               </button>
               <button
                 onClick={exportHierarchyPDF}
-                disabled={periodTx.length === 0}
+                disabled={reportTx.length === 0}
                 className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
               >
                 Export PDF
               </button>
               <button
                 onClick={exportHierarchyWord}
-                disabled={periodTx.length === 0}
+                disabled={reportTx.length === 0}
                 className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50 dark:bg-indigo-500"
               >
                 Export Word
@@ -2014,7 +2012,6 @@ export default function ReportsImport() {
                                    (t.paymentMethod || '').toUpperCase() === 'M-PESA' ||
                                    !t.paymentMethod; // Default to MPESA if no method specified
                     if (isMpesa && !refCode) {
-                      refCode = genReferenceCode(usedRefs);
                       refCode = generateLocalMpesaCode(usedRefs);
                       usedRefs.add(refCode);
                     }
