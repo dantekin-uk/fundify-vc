@@ -2514,6 +2514,12 @@ export default function ReportsImport() {
 
       .replace(/</g, '&lt;')
 
+      .replace(/>/g, '&gt;')
+
+      .replace(/"/g, '&quot;')
+
+      .replace(/'/g, '&#039;');
+
     const displayAmount = (v) => {
       const n = Number(v);
       if (!isFinite(n) || n === 0) return '';
