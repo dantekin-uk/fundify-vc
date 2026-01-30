@@ -1384,6 +1384,7 @@ export default function ReportsImport() {
 
   const exportHierarchyPDF = () => {
     if (!periodTx.length && !reportTx.length) return;
+    try {
     // "PDF export" via print dialog (Save as PDF)
     const title = reportType === 'monthly'
       ? 'Monthly Expenditure Report'
@@ -1475,17 +1476,18 @@ export default function ReportsImport() {
       // Group transactions by month
       const byMonth = {};
       transactionsWithRefs.forEach(t => {
-        const m = t.dateOfPayment ? t.dateOfPayment.toISOString().slice(0, 7) : 'Unknown';
-        if (!byMonth[m]) byMonth[m] = [];
-        byMonth[m].push(t);
+        const d = t.dateOfPayment instanceof Date ? t.dateOfPayment : (t.dateOfPayment ? new Date(t.dateOfPayment) : null);
+        const monthKey = (d && !isNaN(d.getTime())) ? d.toISOString().slice(0, 7) : 'Unknown';
+        if (!byMonth[monthKey]) byMonth[monthKey] = [];
+        byMonth[monthKey].push(t);
       });
 
       const sortedMonths = Object.keys(byMonth).sort();
 
-      body = sortedMonths.map(m => {
-        const monthDate = new Date(m + '-01');
+      body = sortedMonths.map((monthKey) => {
+        const monthDate = new Date(monthKey + '-01');
         const monthLabel = isNaN(monthDate.getTime()) ? 'Unknown Date' : monthDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
-        const monthContent = generateCategoryBlocks(byMonth[m]);
+        const monthContent = generateCategoryBlocks(byMonth[monthKey]);
 
         return `
           <div style="margin-top: 40px; page-break-inside: avoid;">
@@ -1759,6 +1761,10 @@ export default function ReportsImport() {
         // Final fallback: download HTML for manual print
         downloadText(`NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.html`, html, 'text/html;charset=utf-8');
       }
+    }
+    } catch (e) {
+      console.error('PDF Export Error:', e);
+      alert('An error occurred while generating the PDF. Please check the console for details.');
     }
   };
 
