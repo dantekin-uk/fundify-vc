@@ -2695,15 +2695,12 @@ export default function ReportsImport() {
       <div style="font-weight:800;">Executive Summary</div>
 
       <div class="grid" style="margin-top:10px;">
-
+        ${totalAllocation ? `<div><div class="muted">Total Allocation</div><div style="font-weight:800;">${esc(formatAmount(totalAllocation, 'KES'))}</div></div>` : ''}
         <div><div class="muted">Total Expenditure</div><div style="font-weight:800;">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))}</div></div>
-
+        ${totalAllocation ? `<div><div class="muted">Balance</div><div style="font-weight:800;">${esc(formatAmount(Number(totalAllocation) - (execSummary.totalExpenditure || 0), 'KES'))}</div></div>` : ''}
         <div><div class="muted">Number of Categories</div><div style="font-weight:800;">${esc(execSummary.numberOfCategories)}</div></div>
-
         <div><div class="muted">Highest Spending Category</div><div style="font-weight:800;">${esc(execSummary.highestSpendingCategory)}</div></div>
-
         <div><div class="muted">Reporting Period Covered</div><div style="font-weight:800;">${esc(periodLabel)}</div></div>
-
       </div>
 
       <div class="muted" style="margin-top:10px;">${esc(narrative)}</div>
@@ -3409,39 +3406,30 @@ export default function ReportsImport() {
     <h2>Executive Summary</h2>
 
     <div class="summary-grid">
-
+      ${totalAllocation ? `
       <div class="summary-item">
-
+        <div class="label">Total Allocation</div>
+        <div class="value">${esc(formatAmount(totalAllocation, 'KES'))}</div>
+      </div>
+      ` : ''}
+      <div class="summary-item">
         <div class="label">Total Expenditure</div>
-
         <div class="value">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))}</div>
-
       </div>
-
+      ${totalAllocation ? `
       <div class="summary-item">
-
-        <div class="label">Transaction Count</div>
-
-        <div class="value">${esc(execSummary.numberOfTransactions)}</div>
-
+        <div class="label">Balance</div>
+        <div class="value">${esc(formatAmount(Number(totalAllocation) - (execSummary.totalExpenditure || 0), 'KES'))}</div>
       </div>
-
+      ` : ''}
       <div class="summary-item">
-
         <div class="label">Categories</div>
-
         <div class="value">${esc(execSummary.numberOfCategories)}</div>
-
       </div>
-
       <div class="summary-item">
-
         <div class="label">Highest Spending Category</div>
-
         <div class="value">${esc(execSummary.highestSpendingCategory)}</div>
-
       </div>
-
     </div>
 
     <p style="font-size: 10pt; margin-top: 15px;">${esc(narrative)}</p>
@@ -3821,11 +3809,10 @@ export default function ReportsImport() {
 
 
       <w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>Executive Summary</w:t></w:r></w:p>
-
+      ${totalAllocation ? `<w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Allocation: ${escapeXml(formatAmount(totalAllocation, 'KES'))}</w:t></w:r></w:p>` : ''}
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Expenditure: ${escapeXml(formatAmount(execSummary.totalExpenditure || 0, 'KES'))}</w:t></w:r></w:p>
-
+      ${totalAllocation ? `<w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Balance: ${escapeXml(formatAmount(Number(totalAllocation) - (execSummary.totalExpenditure || 0), 'KES'))}</w:t></w:r></w:p>` : ''}
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Number of Categories: ${escapeXml(execSummary.numberOfCategories || 0)}</w:t></w:r></w:p>
-
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Reporting Period Covered: ${escapeXml(periodLabel)}</w:t></w:r></w:p>
 
       <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(narrative)}</w:t></w:r></w:p>
