@@ -2806,7 +2806,7 @@ export default function ReportsImport() {
 
     const usedRefs = new Set();
 
-    const transactionsWithRefs = (periodTx.length ? periodTx : reportTx).map((t) => {
+    const transactionsWithRefs = periodTx.map((t) => {
 
       let refCode = t.referenceCode || '';
 
