@@ -342,6 +342,7 @@ export default function ReportsImport() {
   const [reportTo, setReportTo] = useState('');
   const [orgLogo, setOrgLogo] = useState(null);
   const [totalAllocation, setTotalAllocation] = useState('');
+  const [fundsReceived, setFundsReceived] = useState('');
 
   const handleLogoUpload = (e) => {
 
@@ -2862,7 +2863,7 @@ export default function ReportsImport() {
       const showDescription = txList.some(t => String(t.description || '').trim() !== '');
       const showMpesa = txList.some(t => {
          const method = (t.paymentMethod || '').toUpperCase();
-         return !method.includes('CHEQUE');
+         return method.includes('MPESA') || method.includes('M-PESA') || !t.paymentMethod;
       });
 
       const groups = groupTransactionsCategoryPayee(txList);
@@ -2899,8 +2900,12 @@ export default function ReportsImport() {
             const payeeCell = String(t.payeeName || '').trim();
             const expCell = String(t.expenditure || '').trim();
             const descCell = String(t.description || '').trim();
+            
             const methodCell = String(t.paymentMethod || '').trim();
-            const refCell = String(t.referenceCode || '').trim();
+            const methodUpper = methodCell.toUpperCase();
+            const isMpesaTx = methodUpper.includes('MPESA') || methodUpper.includes('M-PESA') || !t.paymentMethod;
+            const refCell = isMpesaTx ? String(t.referenceCode || '').trim() : '';
+            
             const amountCell = displayAmount(t.amount);
             return `
               <tr>
@@ -3412,16 +3417,27 @@ export default function ReportsImport() {
         <div class="value">${esc(formatAmount(totalAllocation, 'KES'))}</div>
       </div>
       ` : ''}
+      ${fundsReceived ? `
+      <div class="summary-item">
+        <div class="label">Funds Received</div>
+        <div class="value">${esc(formatAmount(fundsReceived, 'KES'))}</div>
+      </div>
+      ` : ''}
       <div class="summary-item">
         <div class="label">Total Expenditure</div>
         <div class="value">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))}</div>
       </div>
-      ${totalAllocation ? `
+      ${fundsReceived ? `
+      <div class="summary-item">
+        <div class="label">Balance</div>
+        <div class="value">${esc(formatAmount(Number(fundsReceived) - (execSummary.totalExpenditure || 0), 'KES'))}</div>
+      </div>
+      ` : (totalAllocation ? `
       <div class="summary-item">
         <div class="label">Balance</div>
         <div class="value">${esc(formatAmount(Number(totalAllocation) - (execSummary.totalExpenditure || 0), 'KES'))}</div>
       </div>
-      ` : ''}
+      ` : '')}
       <div class="summary-item">
         <div class="label">Categories</div>
         <div class="value">${esc(execSummary.numberOfCategories)}</div>
@@ -4168,6 +4184,17 @@ export default function ReportsImport() {
                 type="number" 
                 value={totalAllocation} 
                 onChange={(e) => setTotalAllocation(e.target.value)} 
+                placeholder="Optional"
+                className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" 
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Funds Received</label>
+              <input 
+                type="number" 
+                value={fundsReceived} 
+                onChange={(e) => setFundsReceived(e.target.value)} 
                 placeholder="Optional"
                 className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" 
               />
