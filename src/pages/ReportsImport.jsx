@@ -2957,7 +2957,7 @@ export default function ReportsImport() {
 
                   <th>Method</th>
 
-                  ${showMpesa ? `<th>M-Pesa Reference</th>` : ''}
+                  ${showMpesa ? `<th>Reference</th>` : ''}
 
                 </tr>
 
