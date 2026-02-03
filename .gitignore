@@ -1,4 +1,10 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
 node_modules
+.env
+.env.local
+.env.*.local
+dist
+build
+.wrangler
+functions/paystack-webhook/node_modules
+*.log
+.DS_Store

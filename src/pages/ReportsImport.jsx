@@ -2357,37 +2357,13 @@ export default function ReportsImport() {
 
 
     // Normalize categories to handle inconsistencies (case, whitespace, empty).
-
     // This prevents issues like 'Staffs' and 'staffs' being treated as different categories,
-
     // and groups items with no category under 'Uncategorized'.
-
-    // Also implements "fill down" for Excel merged cells where category is only in the first row.
-
-    let lastCategory = '';
-
+    // Important: rely on normalization logic to handle any fill-down; do not apply a second fill-down here.
     const transactions = (normalizedResult.transactions || []).map(t => {
-
-      let rawCategory = String(t.category || '').trim();
-
-      
-
-      if (rawCategory) {
-
-        lastCategory = rawCategory;
-
-      } else if (lastCategory) {
-
-        rawCategory = lastCategory;
-
-      }
-
-
-
-      const category = toTitleCase(rawCategory) || 'Uncategorized';
-
+      const rawCategory = String(t.category || '').trim();
+      const category = rawCategory ? toTitleCase(rawCategory) : 'Uncategorized';
       return { ...t, category };
-
     });
 
 
@@ -2554,30 +2530,43 @@ export default function ReportsImport() {
       const showDescription = allCategoryTx.some(t => String(t.description || '').trim() !== '');
       const showMpesa = allCategoryTx.some(t => {
          const method = (t.paymentMethod || '').toUpperCase();
-         return !method.includes('CHEQUE');
+         return method.includes('MPESA') || method.includes('M-PESA') || !t.paymentMethod;
       });
 
-      const txRows = allCategoryTx.map((t) => `
-
+      const txRows = allCategoryTx
+        .filter((t) => {
+          const d = t.dateOfPayment ? new Date(t.dateOfPayment) : null;
+          const hasDate = d && !isNaN(d.getTime());
+          const hasExp = String(t.expenditure || '').trim() !== '';
+          const hasDesc = String(t.description || '').trim() !== '';
+          const hasPayee = String(t.payeeName || '').trim() !== '';
+          const n = Number(t.amount);
+          const hasAmount = isFinite(n) && n !== 0;
+          return hasDate || hasExp || hasDesc || hasPayee || hasAmount;
+        })
+        .map((t) => {
+          const dateCell = t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '';
+          const payeeCell = String(t.payeeName || '').trim();
+          const expCell = String(t.expenditure || '').trim();
+          const descCell = String(t.description || '').trim();
+          const methodCell = String(t.paymentMethod || '').trim();
+          const methodUpper = methodCell.toUpperCase();
+          const isMpesaTx = methodUpper.includes('MPESA') || methodUpper.includes('M-PESA') || !t.paymentMethod;
+          const refCell = isMpesaTx ? String(t.referenceCode || '').trim() : '';
+          const amountCell = formatAmount(t.amount, 'KES');
+          return `
           <tr>
-
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '')}</td>
-
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.payeeName)}</td>
-
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.expenditure)}</td>
-
-            ${showDescription ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>` : ''}
-
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))}</td>
-
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
-
-            ${showMpesa ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>` : ''}
-
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(dateCell)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(payeeCell)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(expCell)}</td>
+            ${showDescription ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(descCell)}</td>` : ''}
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(amountCell)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(methodCell || '')}</td>
+            ${showMpesa ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(refCell)}</td>` : ''}
           </tr>
-
-        `).join('');
+          `;
+        })
+        .join('');
 
 
       const colSpan = 5 + (showDescription ? 1 : 0) + (showMpesa ? 1 : 0);
@@ -2615,7 +2604,7 @@ export default function ReportsImport() {
 
                 <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Method</th>
 
-                ${showMpesa ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>` : ''}
+                ${showMpesa ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Reference</th>` : ''}
 
               </tr>
 
