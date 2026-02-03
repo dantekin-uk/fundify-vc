@@ -339,12 +339,9 @@ export default function ReportsImport() {
   const [reportFunderId, setReportFunderId] = useState('');
 
   const [reportFrom, setReportFrom] = useState('');
-
   const [reportTo, setReportTo] = useState('');
-
   const [orgLogo, setOrgLogo] = useState(null);
-
-
+  const [totalAllocation, setTotalAllocation] = useState('');
 
   const handleLogoUpload = (e) => {
 
@@ -2452,6 +2449,8 @@ export default function ReportsImport() {
 
       payeeName: t.payeeName,
 
+      expenditure: t.expenditure,
+
       description: t.description,
 
       amount: t.amount,
@@ -2470,27 +2469,34 @@ export default function ReportsImport() {
 
   const exportReportCSV = () => {
 
-    if (!reportRows.length) return;
+    if (!periodTx.length) return;
 
-    const rows = reportRows.map((r) => ({
+    // Check dynamic columns
+    const showMpesa = periodTx.some(t => {
+       const method = (t.paymentMethod || '').toUpperCase();
+       return !method.includes('CHEQUE');
+    });
+    const showDescription = periodTx.some(t => String(t.description || '').trim() !== '');
 
-      Date: r.date,
-
-      Category: r.category,
-
-      Expenditure: r.expenditure,
-
-      'Amount (KSH)': Math.round(r.amount || 0),
-
-      'Paid Via': r.paid_via,
-
-      'M-Pesa Reference': r.mpesa_reference,
-
-      'M-Pesa Number': r.phone_number,
-
-      Status: r.status,
-
-    }));
+    const rows = periodTx.map((t) => {
+      const row = {
+        Date: t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '',
+        Category: t.category,
+        Payee: t.payeeName,
+        Expenditure: t.expenditure,
+      };
+      if (showDescription) {
+        row.Description = t.description;
+      }
+      row['Amount (KSH)'] = Math.round(t.amount || 0);
+      row['Payment Method'] = t.paymentMethod;
+      
+      if (showMpesa) {
+        row['M-Pesa Reference'] = t.referenceCode;
+      }
+      
+      return row;
+    });
 
     downloadCSV('funder_transactions.csv', rows);
 
@@ -2544,7 +2550,11 @@ export default function ReportsImport() {
 
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
 
-      
+      const showDescription = allCategoryTx.some(t => String(t.description || '').trim() !== '');
+      const showMpesa = allCategoryTx.some(t => {
+         const method = (t.paymentMethod || '').toUpperCase();
+         return !method.includes('CHEQUE');
+      });
 
       const txRows = allCategoryTx.map((t) => `
 
@@ -2554,21 +2564,23 @@ export default function ReportsImport() {
 
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.payeeName)}</td>
 
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.expenditure)}</td>
+
+            ${showDescription ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.description)}</td>` : ''}
 
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))}</td>
 
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(t.paymentMethod || '')}</td>
 
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>
+            ${showMpesa ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(t.referenceCode || '')}</td>` : ''}
 
           </tr>
 
         `).join('');
 
 
-
-      const rowsHtml = txRows || `<tr><td colspan="6" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName)} in this period</td></tr>`;
+      const colSpan = 5 + (showDescription ? 1 : 0) + (showMpesa ? 1 : 0);
+      const rowsHtml = txRows || `<tr><td colspan="${colSpan}" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName)} in this period</td></tr>`;
 
 
 
@@ -2594,13 +2606,15 @@ export default function ReportsImport() {
 
                 <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Payee</th>
 
-                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Description</th>
+                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Expenditure</th>
+
+                ${showDescription ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Description</th>` : ''}
 
                 <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Amount</th>
 
                 <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Method</th>
 
-                <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>
+                ${showMpesa ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">M-Pesa Ref</th>` : ''}
 
               </tr>
 
@@ -2839,13 +2853,20 @@ export default function ReportsImport() {
 
     }));
 
-    const isMultiMonth = uniqueMonths.size > 1 && (reportType === 'yearly' || reportType === 'all' || reportType === 'quarterly');
+    const isMultiMonth = uniqueMonths.size > 1 && (reportType === 'all' || reportType === 'quarterly');
 
 
 
     // Helper to generate category HTML blocks
 
     const generateCategoryBlocks = (txList) => {
+
+      // Determine dynamic columns based on data content
+      const showDescription = txList.some(t => String(t.description || '').trim() !== '');
+      const showMpesa = txList.some(t => {
+         const method = (t.paymentMethod || '').toUpperCase();
+         return !method.includes('CHEQUE');
+      });
 
       const groups = groupTransactionsCategoryPayee(txList);
 
@@ -2868,17 +2889,19 @@ export default function ReportsImport() {
           .filter((t) => {
             const d = t.dateOfPayment ? new Date(t.dateOfPayment) : null;
             const hasDate = d && !isNaN(d.getTime());
+            const hasExp = String(t.expenditure || '').trim() !== '';
             const hasDesc = String(t.description || '').trim() !== '';
             const hasPayee = String(t.payeeName || '').trim() !== '';
             const n = Number(t.amount);
             const hasAmount = isFinite(n) && n !== 0;
-            return hasDate || hasDesc || hasPayee || hasAmount;
+            return hasDate || hasExp || hasDesc || hasPayee || hasAmount;
           })
           .map((t) => {
             const d = t.dateOfPayment ? (t.dateOfPayment instanceof Date ? t.dateOfPayment : new Date(t.dateOfPayment)) : null;
             const dateCell = d && !isNaN(d.getTime()) ? d.toLocaleDateString() : '';
             const payeeCell = String(t.payeeName || '').trim();
-            const expCell = String(t.description || '').trim();
+            const expCell = String(t.expenditure || '').trim();
+            const descCell = String(t.description || '').trim();
             const methodCell = String(t.paymentMethod || '').trim();
             const refCell = String(t.referenceCode || '').trim();
             const amountCell = displayAmount(t.amount);
@@ -2887,16 +2910,18 @@ export default function ReportsImport() {
                 <td>${esc(dateCell)}</td>
                 <td>${esc(payeeCell)}</td>
                 <td>${esc(expCell)}</td>
+                ${showDescription ? `<td>${esc(descCell)}</td>` : ''}
                 <td class="text-right">${amountCell}</td>
                 <td>${esc(methodCell)}</td>
-                <td>${esc(refCell)}</td>
+                ${showMpesa ? `<td>${esc(refCell)}</td>` : ''}
               </tr>
             `;
           })
 
 
 
-        const rowsHtml = txRows.length ? txRows.join('') : `<tr><td colspan="6" class="no-transactions">No transactions for this category</td></tr>`;
+        const colSpan = 5 + (showDescription ? 1 : 0) + (showMpesa ? 1 : 0);
+        const rowsHtml = txRows.length ? txRows.join('') : `<tr><td colspan="${colSpan}" class="no-transactions">No transactions for this category</td></tr>`;
 
 
 
@@ -2924,11 +2949,13 @@ export default function ReportsImport() {
 
                   <th>Expenditure</th>
 
+                  ${showDescription ? `<th>Description</th>` : ''}
+
                   <th class="text-right">Amount</th>
 
                   <th>Method</th>
 
-                  <th>M-Pesa Reference</th>
+                  ${showMpesa ? `<th>M-Pesa Reference</th>` : ''}
 
                 </tr>
 
@@ -3669,7 +3696,11 @@ export default function ReportsImport() {
 
       const allCategoryTx = c.payees.flatMap(p => p.transactions.map(t => ({...t, payeeName: p.payeeName})));
 
-      
+      const showDescription = allCategoryTx.some(t => String(t.description || '').trim() !== '');
+      const showMpesa = allCategoryTx.some(t => {
+         const method = (t.paymentMethod || '').toUpperCase();
+         return !method.includes('CHEQUE');
+      });
 
       const txRows = allCategoryTx.map((t) => `
 
@@ -3679,25 +3710,27 @@ export default function ReportsImport() {
 
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.payeeName || '')}</w:t></w:r></w:p></w:tc>
 
-            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.expenditure || '')}</w:t></w:r></w:p></w:tc>
+
+            ${showDescription ? `<w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>` : ''}
 
             <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))}</w:t></w:r></w:p></w:tc>
 
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.paymentMethod || '')}</w:t></w:r></w:p></w:tc>
 
-            <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>
+            ${showMpesa ? `<w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>` : ''}
 
           </w:tr>
 
         `).join('');
 
 
-
+      const colSpan = 5 + (showDescription ? 1 : 0) + (showMpesa ? 1 : 0);
       const rowsXml = txRows || `
 
         <w:tr>
 
-          <w:tc><w:tcPr><w:gridSpan w:val="6"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:i/><w:color w:val="666666"/><w:t>No transactions for ${escapeXml(c.categoryName)} in this period</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:gridSpan w:val="${colSpan}"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:i/><w:color w:val="666666"/><w:t>No transactions for ${escapeXml(c.categoryName)} in this period</w:t></w:r></w:p></w:tc>
 
         </w:tr>
 
@@ -3741,11 +3774,13 @@ export default function ReportsImport() {
 
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Expenditure</w:t></w:r></w:p></w:tc>
 
+              ${showDescription ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Description</w:t></w:r></w:p></w:tc>` : ''}
+
               <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
 
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Method</w:t></w:r></w:p></w:tc>
 
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Ref</w:t></w:r></w:p></w:tc>
+              ${showMpesa ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Ref</w:t></w:r></w:p></w:tc>` : ''}
 
             </w:tr>
 
@@ -4140,7 +4175,16 @@ export default function ReportsImport() {
 
             </div>
 
-
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Total Allocation</label>
+              <input 
+                type="number" 
+                value={totalAllocation} 
+                onChange={(e) => setTotalAllocation(e.target.value)} 
+                placeholder="Optional"
+                className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" 
+              />
+            </div>
 
             <div className="md:col-span-5 flex flex-wrap items-center gap-3">
 

@@ -339,7 +339,17 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     let amount = parseAmount(pick(r, ['amount', 'amt']));
     let category = String(pick(r, ['category']) ?? '').trim();
     let payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier']) ?? '').trim();
-    const description = String(pick(r, ['expenditure', 'description', 'purpose', 'narration']) ?? '').trim();
+    
+    // Extract Expenditure (main item/purpose) and Description (extra details)
+    let expenditure = String(pick(r, ['expenditure', 'item', 'particulars', 'purpose']) ?? '').trim();
+    let description = String(pick(r, ['description', 'narration', 'details', 'notes']) ?? '').trim();
+
+    // If we only found a description but no expenditure, treat the description as the main expenditure
+    if (!expenditure && description) {
+      expenditure = description;
+      description = '';
+    }
+
     const paymentMethod = String(pick(r, ['paymentMethod', 'payment_method', 'paid_via', 'paidvia', 'method']) ?? defaultPaymentMethod).trim() || defaultPaymentMethod;
     const referenceCodeRaw = String(pick(r, ['referenceCode', 'reference_code', 'mpesa_reference', 'mpesa_code', 'mpesa_referral', 'mpesa', 'reference']) ?? '').trim();
     const projectName = String(pick(r, ['projectName', 'project_name', 'project']) ?? '').trim();
@@ -347,7 +357,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     const phoneNumberRaw = String(pick(r, ['phoneNumber', 'phone_number', 'msisdn', 'phone']) ?? '').trim();
 
     // Skip completely empty rows (no meaningful data)
-    const hasAnyData = date || Number.isFinite(amount) || category || payeeName || description || referenceCodeRaw || projectName || transactionIdRaw || phoneNumberRaw;
+    const hasAnyData = date || Number.isFinite(amount) || category || payeeName || expenditure || description || referenceCodeRaw || projectName || transactionIdRaw || phoneNumberRaw;
     if (!hasAnyData) {
       skippedEmptyRows++;
       continue; // Skip this row entirely
@@ -365,7 +375,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
 
     // Forward-fill category for rows that are part of a category block but have empty category cells
     // Typical Excel structure: first row has category only (payee empty), subsequent rows have payees with blank category cells
-    if (!category && (payeeName || description || Number.isFinite(amount))) {
+    if (!category && (payeeName || expenditure || description || Number.isFinite(amount))) {
       category = lastCategory;
     }
     if (category) {
@@ -390,6 +400,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
       dateOfPayment: date,
       category,
       payeeName,
+      expenditure,
       description,
       phoneNumber: phoneNumberRaw || null,
       amount,
