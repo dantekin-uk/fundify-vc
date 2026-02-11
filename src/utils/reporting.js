@@ -335,14 +335,14 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
   for (let idx = 0; idx < rows.length; idx++) {
     const r = rows[idx] || {};
 
-    const date = parseDate(pick(r, ['dateOfPayment', 'date_of_payment', 'date']));
-    let amount = parseAmount(pick(r, ['amount', 'amt']));
-    let category = String(pick(r, ['category']) ?? '').trim();
-    let payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier']) ?? '').trim();
-    
+    const date = parseDate(pick(r, ['dateOfPayment', 'date_of_payment', 'date', 'transaction_date', 'transactiondate', 'payment_date', 'paymentdate', 'posting_date', 'postingdate']));
+    let amount = parseAmount(pick(r, ['amount', 'amt', 'value', 'transaction_amount', 'transactionamount', 'expenditure_amount', 'expenditureamount', 'total', 'sum']));
+    let category = String(pick(r, ['category', 'type', 'classification', 'expense_category', 'expensecategory']) ?? '').trim();
+    let payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier', 'vendor', 'beneficiary', 'paid_to', 'paidto', 'made_to', 'madeto']) ?? '').trim();
+
     // Extract Expenditure (main item/purpose) and Description (extra details)
-    let expenditure = String(pick(r, ['expenditure', 'item', 'particulars', 'purpose']) ?? '').trim();
-    let description = String(pick(r, ['description', 'narration', 'details', 'notes']) ?? '').trim();
+    let expenditure = String(pick(r, ['expenditure', 'item', 'particulars', 'purpose', 'description', 'expense', 'goods_services', 'goodsservices', 'service', 'goods']) ?? '').trim();
+    let description = String(pick(r, ['description', 'narration', 'details', 'notes', 'remarks', 'comment', 'memo', 'explanation']) ?? '').trim();
 
     // If we only found a description but no expenditure, treat the description as the main expenditure
     if (!expenditure && description) {
@@ -350,22 +350,20 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
       description = '';
     }
 
-    const paymentMethod = String(pick(r, ['paymentMethod', 'payment_method', 'paid_via', 'paidvia', 'method']) ?? defaultPaymentMethod).trim() || defaultPaymentMethod;
-    const referenceCodeRaw = String(pick(r, ['referenceCode', 'reference_code', 'mpesa_reference', 'mpesa_code', 'mpesa_referral', 'mpesa', 'reference']) ?? '').trim();
-    const projectName = String(pick(r, ['projectName', 'project_name', 'project']) ?? '').trim();
-    const transactionIdRaw = String(pick(r, ['transactionId', 'transaction_id', 'id']) ?? '').trim();
-    const phoneNumberRaw = String(pick(r, ['phoneNumber', 'phone_number', 'msisdn', 'phone']) ?? '').trim();
+    const paymentMethod = String(pick(r, ['paymentMethod', 'payment_method', 'paid_via', 'paidvia', 'method', 'mode', 'payment_mode', 'paymentmode', 'how_paid', 'howpaid']) ?? defaultPaymentMethod).trim() || defaultPaymentMethod;
+    const referenceCodeRaw = String(pick(r, ['referenceCode', 'reference_code', 'mpesa_reference', 'mpesa_code', 'mpesa_referral', 'mpesa', 'reference', 'ref_code', 'refcode', 'trans_ref', 'transref', 'receipt_number', 'receiptnumber']) ?? '').trim();
+    const projectName = String(pick(r, ['projectName', 'project_name', 'project', 'program', 'programme']) ?? '').trim();
+    const transactionIdRaw = String(pick(r, ['transactionId', 'transaction_id', 'id', 'txn_id', 'txnid', 'receipt_id', 'receiptid']) ?? '').trim();
+    const phoneNumberRaw = String(pick(r, ['phoneNumber', 'phone_number', 'msisdn', 'phone', 'tel', 'telephone', 'mobile', 'mobile_number', 'mobilenumber', 'contact']) ?? '').trim();
+    const voucherNoRaw = String(pick(r, ['voucherNo', 'voucher_no', 'voucher', 'voucher_number', 'vouchernumber', 'check_number', 'checknumber', 'cheque_number', 'chequenumber', 'invoice_number', 'invoicenumber', 'receipt']) ?? '').trim();
 
     // Skip completely empty rows (no meaningful data)
-    const hasAnyData = date || Number.isFinite(amount) || category || payeeName || expenditure || description || referenceCodeRaw || projectName || transactionIdRaw || phoneNumberRaw;
+    const hasAnyData = date || Number.isFinite(amount) || category || payeeName || expenditure || description || referenceCodeRaw || projectName || transactionIdRaw || phoneNumberRaw || voucherNoRaw;
     if (!hasAnyData) {
       skippedEmptyRows++;
       continue; // Skip this row entirely
     }
 
-    if (!date || isNaN(date.getTime())) { 
-      warnInvalidDate++; 
-    }
     if (!Number.isFinite(amount)) {
       warnInvalidAmount++;
       amount = 0;
@@ -403,6 +401,7 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
       expenditure,
       description,
       phoneNumber: phoneNumberRaw || null,
+      voucherNo: voucherNoRaw || null,
       amount,
       paymentMethod: paymentMethod || null,
       referenceCode: referenceCode || null,
@@ -411,10 +410,31 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     });
   }
 
-  if (warnInvalidDate > 0) warnings.push(`${warnInvalidDate} row(s) have invalid/missing dates and were included with empty dates.`);
-  if (warnInvalidAmount > 0) warnings.push(`${warnInvalidAmount} row(s) have invalid/missing amounts and were included as 0.`);
-  if (skippedEmptyRows > 0) warnings.push(`${skippedEmptyRows} empty row(s) were skipped and will not appear in reports.`);
-  if (!out.length) errors.push('No transactions found.');
+  // Analyze what fields were actually found for better feedback
+  const fieldsFound = new Set();
+  const missingOptionalFields = [];
+
+  if (out.length > 0) {
+    out.forEach(tx => {
+      if (tx.dateOfPayment) fieldsFound.add('dateOfPayment');
+      if (tx.amount) fieldsFound.add('amount');
+      if (tx.category) fieldsFound.add('category');
+      if (tx.payeeName) fieldsFound.add('payeeName');
+      if (tx.expenditure || tx.description) fieldsFound.add('expenditure/description');
+      if (tx.voucherNo) fieldsFound.add('voucherNo');
+    });
+  }
+
+  if (warnInvalidDate > 0) warnings.push(`${warnInvalidDate} row(s) have invalid or unparseable dates - these will be included with empty dates.`);
+  if (warnInvalidAmount > 0) warnings.push(`${warnInvalidAmount} row(s) have invalid or missing amounts - these will be included as 0.`);
+  if (skippedEmptyRows > 0) warnings.push(`${skippedEmptyRows} completely empty row(s) were skipped.`);
+
+  if (!fieldsFound.has('dateOfPayment') && out.length > 0) warnings.push('No date column was detected. Dates can be named: date, dateOfPayment, transaction_date, payment_date, posting_date, or similar.');
+  if (!fieldsFound.has('amount') && out.length > 0) warnings.push('No amount column was detected. Amounts can be named: amount, value, total, expenditure_amount, or similar.');
+  if (!fieldsFound.has('payeeName') && out.length > 0) warnings.push('No payee/vendor column was detected (optional). Can be named: payee, vendor, beneficiary, supplier, recipient, or similar.');
+  if (!fieldsFound.has('expenditure/description') && out.length > 0) warnings.push('No expenditure/purpose column was detected (optional). Can be named: expenditure, purpose, item, goods_services, description, or similar.');
+
+  if (!out.length) errors.push('No transactions found. Make sure your file has data rows and at least an amount column.');
   return { transactions: out, errors, warnings };
 }
 

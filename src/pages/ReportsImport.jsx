@@ -606,6 +606,8 @@ export default function ReportsImport() {
 
         projectName: 'Project Alpha',
 
+        voucherNo: 'V001',
+
       },
 
     ]);
@@ -636,6 +638,8 @@ export default function ReportsImport() {
 
         projectName: 'Field Outreach',
 
+        voucherNo: 'V101',
+
       },
 
       {
@@ -655,6 +659,62 @@ export default function ReportsImport() {
         referenceCode: '',
 
         projectName: 'Head Office',
+
+        voucherNo: 'V102',
+
+      },
+
+    ]);
+
+  };
+
+
+
+  const downloadFlexibleFormatExample = () => {
+
+    downloadCSV('expenditure_alternative_format.csv', [
+
+      {
+
+        date: '01/15/2026',
+
+        type: 'Staff Costs',
+
+        vendor: 'Jane Doe',
+
+        purpose: 'Project coordinator salary',
+
+        value: '10000',
+
+        payment_mode: 'MPESA',
+
+        receipt_number: '',
+
+        program: 'Project Alpha',
+
+        voucher: 'V001',
+
+      },
+
+      {
+
+        date: '01/10/2026',
+
+        type: 'Operations',
+
+        vendor: 'Office Supplies Ltd',
+
+        goods_services: 'Stationery and printing',
+
+        value: '7500',
+
+        how_paid: 'BANK TRANSFER',
+
+        ref_code: '',
+
+        program: 'Head Office',
+
+        cheque_number: 'CHQ001',
 
       },
 
@@ -2294,13 +2354,15 @@ export default function ReportsImport() {
 
     const rows = Array.isArray(res.rows) ? res.rows : [];
 
-
+    const importFeedback = [];
 
     // Pre-process rows to correct dates before normalization
 
     if (rows.length > 0) {
 
       const header = Object.keys(rows[0]);
+
+      importFeedback.push(`File contains ${header.length} column(s): ${header.join(', ')}`);
 
       const dateKey = header.find(k => {
 
@@ -2310,7 +2372,7 @@ export default function ReportsImport() {
 
       });
 
-
+      if (dateKey) importFeedback.push(`✓ Date column detected: "${dateKey}"`);
 
       if (dateKey) {
 
@@ -2370,7 +2432,9 @@ export default function ReportsImport() {
 
     setReportErrors(normalizedResult.errors || []);
 
-    setReportWarnings(normalizedResult.warnings || []);
+    const allWarnings = [...importFeedback, ...((normalizedResult.warnings || []).filter(w => !w.includes('row(s) have invalid')))];
+
+    setReportWarnings(allWarnings);
 
     setReportTx(transactions);
 
@@ -2467,11 +2531,13 @@ export default function ReportsImport() {
       }
       row['Amount (KSH)'] = Math.round(t.amount || 0);
       row['Payment Method'] = t.paymentMethod;
-      
+
       if (showMpesa) {
-        row['M-Pesa Reference'] = t.referenceCode;
+        const method = (t.paymentMethod || '').toUpperCase();
+        const isMpesa = method.includes('MPESA') || method.includes('M-PESA') || !t.paymentMethod;
+        row['M-Pesa Reference'] = isMpesa ? t.referenceCode : '';
       }
-      
+
       return row;
     });
 
@@ -2487,7 +2553,7 @@ export default function ReportsImport() {
 
       ? 'Monthly Expenditure Report'
 
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report (Tranch 1 and Tranch 2)' : 'Expenditure Report'));
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
 
 
 
@@ -2781,7 +2847,7 @@ export default function ReportsImport() {
 
       ? 'Monthly Expenditure Report'
 
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report (Tranch 1 and Tranch 2)' : 'Expenditure Report'));
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
 
     const filename = `NAPTA_${reportType}_${String(periodLabel).replace(/\s+/g, '_')}.pdf`;
 
@@ -2854,6 +2920,7 @@ export default function ReportsImport() {
          const method = (t.paymentMethod || '').toUpperCase();
          return method.includes('MPESA') || method.includes('M-PESA') || !t.paymentMethod;
       });
+      const showVoucher = txList.some(t => String(t.voucherNo || '').trim() !== '');
 
       const groups = groupTransactionsCategoryPayee(txList);
 
@@ -2894,6 +2961,7 @@ export default function ReportsImport() {
             const methodUpper = methodCell.toUpperCase();
             const isMpesaTx = methodUpper.includes('MPESA') || methodUpper.includes('M-PESA') || !t.paymentMethod;
             const refCell = isMpesaTx ? String(t.referenceCode || '').trim() : '';
+            const voucherCell = String(t.voucherNo || '').trim();
             
             const amountCell = displayAmount(t.amount);
             return `
@@ -2905,6 +2973,7 @@ export default function ReportsImport() {
                 <td class="text-right">${amountCell}</td>
                 <td>${esc(methodCell)}</td>
                 ${showMpesa ? `<td>${esc(refCell)}</td>` : ''}
+                ${showVoucher ? `<td>${esc(voucherCell)}</td>` : ''}
               </tr>
             `;
           })
@@ -2939,33 +3008,20 @@ export default function ReportsImport() {
                   <th>Payee</th>
 
                   <th>Expenditure</th>
-
                   ${showDescription ? `<th>Description</th>` : ''}
-
                   <th class="text-right">Amount</th>
-
                   <th>Method</th>
-
                   ${showMpesa ? `<th>Reference</th>` : ''}
-
+                  ${showVoucher ? `<th>Voucher No</th>` : ''}
                 </tr>
-
               </thead>
-
               <tbody>
-
                 ${rowsHtml}
-
               </tbody>
-
             </table>
-
           </div>
-
         `;
-
       }).join('');
-
     };
 
 
@@ -3587,7 +3643,7 @@ export default function ReportsImport() {
 
       ? 'Monthly Expenditure Report'
 
-      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report (Tranch 1 and Tranch 2)' : 'Expenditure Report'));
+      : (reportType === 'quarterly' ? 'Quarterly Expenditure Report' : (reportType === 'yearly' ? 'Annual Expenditure Report' : 'Expenditure Report'));
 
 
 
@@ -3695,7 +3751,11 @@ export default function ReportsImport() {
          return !method.includes('CHEQUE');
       });
 
-      const txRows = allCategoryTx.map((t) => `
+      const txRows = allCategoryTx.map((t) => {
+          const methodUpper = (t.paymentMethod || '').toUpperCase();
+          const isMpesaTx = methodUpper.includes('MPESA') || methodUpper.includes('M-PESA') || !t.paymentMethod;
+          const refCell = isMpesaTx ? String(t.referenceCode || '').trim() : '';
+          return `
 
           <w:tr>
 
@@ -3711,11 +3771,12 @@ export default function ReportsImport() {
 
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.paymentMethod || '')}</w:t></w:r></w:p></w:tc>
 
-            ${showMpesa ? `<w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(t.referenceCode || '')}</w:t></w:r></w:p></w:tc>` : ''}
+            ${showMpesa ? `<w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/></w:rPr><w:t>${escapeXml(refCell)}</w:t></w:r></w:p></w:tc>` : ''}
 
           </w:tr>
 
-        `).join('');
+        `;
+        }).join('');
 
 
       const colSpan = 5 + (showDescription ? 1 : 0) + (showMpesa ? 1 : 0);
@@ -4070,6 +4131,12 @@ export default function ReportsImport() {
                 <button onClick={downloadExpenditureExample} className="text-xs font-medium text-slate-700 hover:underline dark:text-slate-200">
 
                   Download example file
+
+                </button>
+
+                <button onClick={downloadFlexibleFormatExample} className="text-xs font-medium text-slate-700 hover:underline dark:text-slate-200">
+
+                  Download alternative format example
 
                 </button>
 
