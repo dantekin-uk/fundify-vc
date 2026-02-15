@@ -343,6 +343,7 @@ export default function ReportsImport() {
   const [orgLogo, setOrgLogo] = useState(null);
   const [totalAllocation, setTotalAllocation] = useState('');
   const [fundsReceived, setFundsReceived] = useState('');
+  const [fundsCarriedForward, setFundsCarriedForward] = useState('');
 
   const handleLogoUpload = (e) => {
 
@@ -3459,33 +3460,34 @@ export default function ReportsImport() {
     <h2>Executive Summary</h2>
 
     <div class="summary-grid">
-      ${totalAllocation ? `
+      ${String(totalAllocation || '').trim() ? `
       <div class="summary-item">
         <div class="label">Total Allocation</div>
         <div class="value">${esc(formatAmount(totalAllocation, 'KES'))}</div>
       </div>
       ` : ''}
-      ${fundsReceived ? `
+      ${String(fundsReceived || '').trim() ? `
       <div class="summary-item">
         <div class="label">Funds Received</div>
         <div class="value">${esc(formatAmount(fundsReceived, 'KES'))}</div>
+      </div>
+      ` : ''}
+      ${String(fundsCarriedForward || '').trim() ? `
+      <div class="summary-item">
+        <div class="label">Funds Carried Forward</div>
+        <div class="value">${esc(formatAmount(fundsCarriedForward, 'KES'))}</div>
       </div>
       ` : ''}
       <div class="summary-item">
         <div class="label">Total Expenditure</div>
         <div class="value">${esc(formatAmount(execSummary.totalExpenditure, 'KES'))}</div>
       </div>
-      ${fundsReceived ? `
+      ${String(totalAllocation || '').trim() ? `
       <div class="summary-item">
         <div class="label">Balance</div>
-        <div class="value">${esc(formatAmount(Number(fundsReceived) - (execSummary.totalExpenditure || 0), 'KES'))}</div>
+        <div class="value">${esc(formatAmount(Number(totalAllocation || 0) - (execSummary.totalExpenditure || 0), 'KES'))}</div>
       </div>
-      ` : (totalAllocation ? `
-      <div class="summary-item">
-        <div class="label">Balance</div>
-        <div class="value">${esc(formatAmount(Number(totalAllocation) - (execSummary.totalExpenditure || 0), 'KES'))}</div>
-      </div>
-      ` : '')}
+      ` : ''}
       <div class="summary-item">
         <div class="label">Categories</div>
         <div class="value">${esc(execSummary.numberOfCategories)}</div>
@@ -4248,23 +4250,34 @@ export default function ReportsImport() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Total Allocation</label>
-              <input 
-                type="number" 
-                value={totalAllocation} 
-                onChange={(e) => setTotalAllocation(e.target.value)} 
+              <input
+                type="number"
+                value={totalAllocation}
+                onChange={(e) => setTotalAllocation(e.target.value)}
                 placeholder="Optional"
-                className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" 
+                className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Funds Received</label>
-              <input 
-                type="number" 
-                value={fundsReceived} 
-                onChange={(e) => setFundsReceived(e.target.value)} 
+              <input
+                type="number"
+                value={fundsReceived}
+                onChange={(e) => setFundsReceived(e.target.value)}
                 placeholder="Optional"
-                className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none" 
+                className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Funds Carried Forward</label>
+              <input
+                type="number"
+                value={fundsCarriedForward}
+                onChange={(e) => setFundsCarriedForward(e.target.value)}
+                placeholder="Optional"
+                className="w-full px-3 py-2 rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none"
               />
             </div>
 
