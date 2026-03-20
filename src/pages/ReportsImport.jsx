@@ -2811,7 +2811,7 @@ export default function ReportsImport() {
         .join('');
 
 
-      const colSpan = (showDate ? 1 : 0) + (showPayee ? 1 : 0) + 1 + (showDescription ? 1 : 0) + (showCost ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
+      const colSpan = (showDate ? 1 : 0) + (showPayee ? 1 : 0) + 1 + (showDescription ? 1 : 0) + (showStatus ? 1 : 0) + (showCost ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
       const rowsHtml = txRows || `<tr><td colspan="${colSpan}" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName || 'this section')} in this period</td></tr>`;
 
       const categoryHeader = c.categoryName ? `
@@ -3079,7 +3079,11 @@ export default function ReportsImport() {
          return d && !isNaN(d.getTime());
       });
       const showPayee = txList.some(t => String(t.payeeName || '').trim() !== '');
+      const showOrganization = txList.some(t => String(t.organization || '').trim() !== '');
       const showDescription = txList.some(t => String(t.description || '').trim() !== '');
+      const showExpenditure = txList.some(t => String(t.expenditure || '').trim() !== '');
+      const showStatus = txList.some(t => String(t.status || '').trim() !== '');
+      const showCost = txList.some(t => t.cost != null && t.cost !== 0);
       const showReference = txList.some(t => {
          const method = (t.paymentMethod || '').toUpperCase();
          const hasMpesaRef = (method.includes('MPESA') || method.includes('M-PESA') || !t.paymentMethod) && String(t.referenceCode || '').trim() !== '';
@@ -3088,6 +3092,10 @@ export default function ReportsImport() {
          return hasMpesaRef || hasVoucher || hasRef;
       });
       const showVoucher = txList.some(t => String(t.voucherNo || '').trim() !== '');
+      
+      // Show description/expenditure column if either exists (but only one header)
+      const showDetailsColumn = showDescription || showExpenditure;
+      const detailsColumnHeader = showExpenditure ? 'Expenditure' : 'Description';
 
       const groups = groupTransactionsCategoryPayee(txList);
 
@@ -3113,16 +3121,21 @@ export default function ReportsImport() {
             const hasExp = String(t.expenditure || '').trim() !== '';
             const hasDesc = String(t.description || '').trim() !== '';
             const hasPayee = String(t.payeeName || '').trim() !== '';
+            const hasOrg = String(t.organization || '').trim() !== '';
             const n = Number(t.amount);
             const hasAmount = isFinite(n) && n !== 0;
-            return hasDate || hasExp || hasDesc || hasPayee || hasAmount;
+            const hasCost = t.cost != null && t.cost !== 0;
+            return hasDate || hasExp || hasDesc || hasPayee || hasOrg || hasAmount || hasCost;
           })
           .map((t) => {
             const d = t.dateOfPayment ? (t.dateOfPayment instanceof Date ? t.dateOfPayment : new Date(t.dateOfPayment)) : null;
             const dateCell = d && !isNaN(d.getTime()) ? d.toLocaleDateString() : '';
             const payeeCell = String(t.payeeName || '').trim();
+            const orgCell = String(t.organization || '').trim();
             const expCell = String(t.expenditure || '').trim();
             const descCell = String(t.description || '').trim();
+            const statusCell = String(t.status || '').trim();
+            const costCell = t.cost ? formatAmount(t.cost, 'KES') : '';
             
             const methodCell = String(t.paymentMethod || '').trim();
             const methodUpper = methodCell.toUpperCase();
@@ -3132,13 +3145,19 @@ export default function ReportsImport() {
             const voucherCell = String(t.voucherNo || '').trim();
 
             const amountCell = displayAmount(t.amount);
+            
+            // Use expenditure if available, otherwise description
+            const detailsCell = expCell || descCell;
+            
             return `
               <tr>
                 ${showDate ? `<td>${esc(dateCell)}</td>` : ''}
+                ${showOrganization ? `<td>${esc(orgCell)}</td>` : ''}
                 ${showPayee ? `<td>${esc(payeeCell)}</td>` : ''}
-                <td>${esc(expCell)}</td>
-                ${showDescription ? `<td>${esc(descCell)}</td>` : ''}
-                <td class="text-right">${amountCell}</td>
+                ${showDetailsColumn ? `<td>${esc(detailsCell)}</td>` : ''}
+                ${showStatus ? `<td>${esc(statusCell)}</td>` : ''}
+                ${showCost ? `<td class="text-right">${esc(costCell)}</td>` : ''}
+                <td class="text-right font-semibold">${amountCell}</td>
                 <td>${esc(methodCell)}</td>
                 ${showReference ? `<td>${esc(refCell)}</td>` : ''}
               </tr>
@@ -3147,23 +3166,30 @@ export default function ReportsImport() {
 
 
 
-        const colSpan = (showDate ? 1 : 0) + (showPayee ? 1 : 0) + 1 + (showDescription ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
+        const colSpan = (showDate ? 1 : 0) + (showOrganization ? 1 : 0) + (showPayee ? 1 : 0) + (showDetailsColumn ? 1 : 0) + (showStatus ? 1 : 0) + (showCost ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
         const rowsHtml = txRows.length ? txRows.join('') : `<tr><td colspan="${colSpan}" class="no-transactions">No transactions for this category</td></tr>`;
         
-        return `
-          <div class="category-section">
+        // Only show category header if category name exists
+        const categoryHeaderHtml = c.categoryName ? `
             <div class="category-header">
               <h3>Category: ${esc(c.categoryName)}</h3>
               <div class="total">${esc(formatAmount(c.categoryTotal, 'KES'))}</div>
             </div>
+        ` : '';
+        
+        return `
+          <div class="category-section">
+            ${categoryHeaderHtml}
             <table>
               <thead style="background:#f8fafc;">
                 <tr>
                   ${showDate ? `<th>Date</th>` : ''}
+                  ${showOrganization ? `<th>Organization</th>` : ''}
                   ${showPayee ? `<th>Payee</th>` : ''}
-                  <th>Expenditure</th>
-                  ${showDescription ? `<th>Description</th>` : ''}
-                  <th class="text-right">Amount</th>
+                  ${showDetailsColumn ? `<th>${detailsColumnHeader}</th>` : ''}
+                  ${showStatus ? `<th>Status</th>` : ''}
+                  ${showCost ? `<th class="text-right">Cost</th>` : ''}
+                  <th class="text-right">Total</th>
                   <th>Method</th>
                   ${showReference ? `<th>Reference</th>` : ''}
                 </tr>
@@ -3657,6 +3683,7 @@ export default function ReportsImport() {
 
 
 
+  ${catSummaryRows.trim() ? `
   <div class="summary-card" style="margin-top: 30px;">
 
     <h2>Category Summary</h2>
@@ -3684,6 +3711,7 @@ export default function ReportsImport() {
     </table>
 
   </div>
+  ` : ''}
 
 
 
