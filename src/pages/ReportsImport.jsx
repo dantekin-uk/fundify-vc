@@ -30,6 +30,8 @@ import {
 
 
 
+import FinancialReport from '../components/FinancialReport';
+
 function toCSV(rows) {
 
   if (!rows.length) return '';
@@ -345,6 +347,17 @@ export default function ReportsImport() {
   const [fundsReceived, setFundsReceived] = useState('');
   const [fundsCarriedForward, setFundsCarriedForward] = useState('');
 
+  // New: Financial report section (replica of expenditure report without M-Pesa/cheque)
+  const [financialFileRows, setFinancialFileRows] = useState([]);
+  const [financialTx, setFinancialTx] = useState([]);
+  const [financialErrors, setFinancialErrors] = useState([]);
+  const [financialWarnings, setFinancialWarnings] = useState([]);
+  const [financialPeriodLabel, setFinancialPeriodLabel] = useState('');
+  const [financialLogo, setFinancialLogo] = useState(null);
+  const [showFinancialSection, setShowFinancialSection] = useState(false);
+
+
+
   const handleLogoUpload = (e) => {
 
     const file = e.target.files[0];
@@ -354,6 +367,22 @@ export default function ReportsImport() {
       const reader = new FileReader();
 
       reader.onload = (e) => setOrgLogo(e.target.result);
+
+      reader.readAsDataURL(file);
+
+    }
+
+  };
+
+  const handleFinancialLogoUpload = (e) => {
+
+    const file = e.target.files[0];
+
+    if (file) {
+
+      const reader = new FileReader();
+
+      reader.onload = (e) => setFinancialLogo(e.target.result);
 
       reader.readAsDataURL(file);
 
@@ -2477,7 +2506,131 @@ export default function ReportsImport() {
 
   };
 
+  const onPickFinancialFile = async (file) => {
 
+    setFinancialErrors([]);
+
+    setFinancialWarnings([]);
+
+    setFinancialFileRows([]);
+
+    setFinancialTx([]);
+
+    if (!file) return;
+
+    const res = await readSpreadsheetFile(file);
+
+    if (res.error) {
+
+      setFinancialErrors([res.error]);
+
+      return;
+
+    }
+
+    const rows = Array.isArray(res.rows) ? res.rows : [];
+
+    const importFeedback = [];
+
+    if (rows.length > 0) {
+
+      const header = Object.keys(rows[0]);
+
+      importFeedback.push(`File contains ${header.length} column(s): ${header.join(', ')}`);
+
+    }
+
+    setFinancialFileRows(rows);
+
+    // Process financial data with organization, amount, status, item, cost columns
+
+    const errors = [];
+
+    const warnings = [];
+
+    const transactions = [];
+
+    let totalAmount = 0;
+
+    const headerMap = rows.length > 0 ? Object.keys(rows[0]) : [];
+
+    
+
+    // Find column keys (flexible header matching)
+
+    const findKey = (candidates) => {
+      for (const c of candidates) {
+        const normalizedC = String(c).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const found = headerMap.find(k => String(k).toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedC);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const orgKey = findKey(['organization', 'org', 'organisation', 'company', 'vendor', 'supplier']);
+    const amountKey = findKey(['amount', 'amt', 'total', 'value', 'sum']);
+    const statusKey = findKey(['status', 'state', 'condition', 'paymentstatus']);
+    const itemKey = findKey(['item', 'description', 'desc', 'narration', 'purpose', 'details']);
+    const costKey = findKey(['cost', 'unitprice', 'price', 'rate']);
+
+    if (!orgKey) errors.push('No organization column found. Expected: organization, org, company, vendor');
+    if (!amountKey && !costKey) errors.push('No amount or cost column found. Expected: amount, cost, total, price');
+
+    let rowNum = 0;
+
+    for (const row of rows) {
+      rowNum++;
+      
+      const organization = orgKey ? String(row[orgKey] || '').trim() : '';
+      const item = itemKey ? String(row[itemKey] || '').trim() : '';
+      const status = statusKey ? String(row[statusKey] || '').trim() : '';
+      
+      // Parse amount (prefer amount column, fall back to cost)
+      let amount = 0;
+      const amountStr = amountKey ? row[amountKey] : (costKey ? row[costKey] : null);
+      if (amountStr != null && String(amountStr).trim() !== '') {
+        const parsed = parseFloat(String(amountStr).replace(/[^0-9.-]/g, ''));
+        if (!isNaN(parsed) && isFinite(parsed)) {
+          amount = parsed;
+          totalAmount += amount;
+        }
+      }
+
+      // Skip completely empty rows
+      const hasData = organization || item || status || amount !== 0;
+      if (!hasData) continue;
+
+      transactions.push({
+        rowNumber: rowNum,
+        organization,
+        item,
+        status,
+        amount,
+        // Keep original row data for reference
+        raw: row
+      });
+    }
+
+    if (transactions.length === 0 && !errors.length) {
+      errors.push('No valid data rows found in file.');
+    }
+
+    if (errors.length === 0) {
+      importFeedback.push(`✓ Imported ${transactions.length} rows`);
+      importFeedback.push(`✓ Total amount: ${formatAmount(totalAmount, 'KES')}`);
+    }
+
+    setFinancialErrors(errors);
+
+    setFinancialWarnings([...importFeedback, ...warnings]);
+
+    setFinancialTx(transactions);
+
+    setFinancialPeriodLabel('Financial Report');
+
+    setShowFinancialSection(true);
+
+  };
 
   const reportPreview = useMemo(() => {
 
@@ -4076,6 +4229,151 @@ export default function ReportsImport() {
     downloadCSV('transactions_filtered.csv', organizedRows);
   };
 
+  // Export functions for Financial Report
+  const exportFinancialPDF = () => {
+    if (!financialTx.length) return;
+
+    const totalAmount = financialTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const title = 'Financial Report';
+    const periodLabel = financialPeriodLabel || 'Financial Period';
+    const filename = `Financial_Report_${String(periodLabel).replace(/\s+/g, '_')}.pdf`;
+
+    const htmlRows = financialTx.map((t) => `
+      <tr>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.organization)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.item)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.status)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(formatAmount(t.amount, 'KES'))}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(title)} - ${esc(periodLabel)}</title>
+  <style>
+    @page { size: A4; margin: 20mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #333; font-size: 10pt; line-height: 1.4; }
+    .report-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+    .report-header h1 { font-size: 20pt; margin: 0; color: #111; }
+    .period { font-size: 11pt; color: #666; margin-top: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th { text-align: left; padding: 8px; background: #f8fafc; border-bottom: 2px solid #e5e7eb; font-size: 10pt; font-weight: 600; }
+    .summary-card { background: #f8fafc; padding: 12px; border-radius: 8px; margin-top: 20px; }
+    .summary-card h3 { margin: 0 0 8px 0; font-size: 12pt; color: #111; }
+    .total-row { font-weight: 700; font-size: 11pt; background: #eef2ff; }
+  </style>
+</head>
+<body>
+  <div class="report-header">
+    ${financialLogo ? `<img src="${financialLogo}" style="max-height: 60px; margin-bottom: 10px;" /><br/>` : ''}
+    <h1>${esc(title)}</h1>
+    <div class="period">${esc(periodLabel)}</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Organization</th>
+        <th>Item</th>
+        <th>Status</th>
+        <th style="text-align:right;">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${htmlRows}
+      <tr class="total-row">
+        <td colspan="3" style="padding:10px 8px;border-top:2px solid #ccc;"><strong>Total Amount</strong></td>
+        <td style="padding:10px 8px;border-top:2px solid #ccc;text-align:right;white-space:nowrap;"><strong>${esc(formatAmount(totalAmount, 'KES'))}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="summary-card">
+    <h3>Summary</h3>
+    <div><strong>Total Records:</strong> ${financialTx.length}</div>
+    <div><strong>Total Amount:</strong> ${esc(formatAmount(totalAmount, 'KES'))}</div>
+  </div>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to export PDF');
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
+  const exportFinancialWord = () => {
+    if (!financialTx.length) return;
+
+    const totalAmount = financialTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const escapeXml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    const title = 'Financial Report';
+    const periodLabel = financialPeriodLabel || 'Financial Period';
+
+    const tableRows = financialTx.map((t) => `
+      <w:tr>
+        <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.organization)}</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.item)}</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.status)}</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))}</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    `).join('');
+
+    const wordXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml">
+  <w:body>
+    <w:p><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${escapeXml(title)}</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escapeXml(periodLabel)}</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Records: ${financialTx.length}</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>Total Amount: ${escapeXml(formatAmount(totalAmount, 'KES'))}</w:t></w:r></w:p>
+    
+    <w:tbl>
+      <w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>
+        <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+        <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+        <w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+        <w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+        <w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+        <w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>
+      </w:tblBorders></w:tblPr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Organization</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Item</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Status</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      ${tableRows}
+      <w:tr>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Total</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(formatAmount(totalAmount, 'KES'))}</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+  </w:body>
+</w:wordDocument>`;
+
+    const blob = new Blob([wordXml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Financial_Report_${String(periodLabel).replace(/\s+/g, '_')}.doc`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
 
 
   return (
@@ -5027,6 +5325,120 @@ export default function ReportsImport() {
 
         </CardContent>
 
+      </Card>
+
+
+      {/* Financial Report Section (replica of NAPTA without expenditure fields) */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Generate Financial Report</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Logo Upload */}
+          <div className="space-y-2">
+            <Label htmlFor="financial-logo">Upload Logo (optional)</Label>
+            <Input
+              id="financial-logo"
+              type="file"
+              accept="image/*"
+              onChange={handleFinancialLogoUpload}
+            />
+            {financialLogo && (
+              <div className="mt-2">
+                <img src={financialLogo} alt="Logo Preview" className="h-16 object-contain" />
+              </div>
+            )}
+          </div>
+
+          {/* File Import */}
+          <div className="space-y-2">
+            <Label htmlFor="financial-file">Import CSV/Excel File</Label>
+            <Input
+              id="financial-file"
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onPickFinancialFile(file);
+                e.target.value = '';
+              }}
+            />
+            <p className="text-xs text-gray-500">
+              Expected columns: organization, amount, status, item, cost (optional)
+            </p>
+          </div>
+
+          {/* Period Label Input */}
+          <div className="space-y-2">
+            <Label htmlFor="financial-period">Period Label</Label>
+            <Input
+              id="financial-period"
+              type="text"
+              placeholder="e.g., Q1 2025 or January 2025"
+              value={financialPeriodLabel}
+              onChange={(e) => setFinancialPeriodLabel(e.target.value)}
+            />
+          </div>
+
+          {/* Import Feedback */}
+          {financialWarnings.length > 0 && (
+            <div className="bg-blue-50 p-3 rounded text-sm text-blue-700 space-y-1">
+              {financialWarnings.map((w, i) => <p key={i}>{w}</p>)}
+            </div>
+          )}
+
+          {financialErrors.length > 0 && (
+            <div className="bg-red-50 p-3 rounded text-sm text-red-700 space-y-1">
+              <p className="font-semibold">Import errors:</p>
+              {financialErrors.map((e, i) => <p key={i}>• {e}</p>)}
+            </div>
+          )}
+
+          {/* Preview Table */}
+          {showFinancialSection && financialTx.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-gray-900 dark:text-slate-100">Preview</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border">
+                  <thead className="bg-gray-100 dark:bg-slate-700">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Organization</th>
+                      <th className="px-3 py-2 text-left">Item</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                      <th className="px-3 py-2 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {financialTx.map((t, i) => (
+                      <tr key={i} className="border-b">
+                        <td className="px-3 py-2">{t.organization}</td>
+                        <td className="px-3 py-2">{t.item}</td>
+                        <td className="px-3 py-2">{t.status}</td>
+                        <td className="px-3 py-2 text-right font-medium">{formatAmount(t.amount, 'KES')}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50 dark:bg-slate-800 font-bold">
+                      <td colSpan={3} className="px-3 py-2 text-right">Total Amount:</td>
+                      <td className="px-3 py-2 text-right">
+                        {formatAmount(financialTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0), 'KES')}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Export Buttons */}
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={exportFinancialPDF} disabled={financialTx.length === 0}>
+                  Export PDF
+                </Button>
+                <Button onClick={exportFinancialWord} disabled={financialTx.length === 0} variant="secondary">
+                  Export Word
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
     </div>
