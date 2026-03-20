@@ -3080,6 +3080,10 @@ export default function ReportsImport() {
       });
       const showPayee = txList.some(t => String(t.payeeName || '').trim() !== '');
       const showOrganization = txList.some(t => String(t.organization || '').trim() !== '');
+      
+      // Organization and Payee are mutually exclusive - show only one
+      const showEntityColumn = showPayee || showOrganization;
+      const entityColumnHeader = showOrganization ? 'Organization' : 'Payee';
       const showDescription = txList.some(t => String(t.description || '').trim() !== '');
       const showExpenditure = txList.some(t => String(t.expenditure || '').trim() !== '');
       const showStatus = txList.some(t => String(t.status || '').trim() !== '');
@@ -3149,11 +3153,13 @@ export default function ReportsImport() {
             // Use expenditure if available, otherwise description
             const detailsCell = expCell || descCell;
             
+            // Use organization if available, otherwise payee
+            const entityCell = orgCell || payeeCell;
+            
             return `
               <tr>
                 ${showDate ? `<td>${esc(dateCell)}</td>` : ''}
-                ${showOrganization ? `<td>${esc(orgCell)}</td>` : ''}
-                ${showPayee ? `<td>${esc(payeeCell)}</td>` : ''}
+                ${showEntityColumn ? `<td>${esc(entityCell)}</td>` : ''}
                 ${showDetailsColumn ? `<td>${esc(detailsCell)}</td>` : ''}
                 ${showStatus ? `<td>${esc(statusCell)}</td>` : ''}
                 ${showCost ? `<td class="text-right">${esc(costCell)}</td>` : ''}
@@ -3166,7 +3172,7 @@ export default function ReportsImport() {
 
 
 
-        const colSpan = (showDate ? 1 : 0) + (showOrganization ? 1 : 0) + (showPayee ? 1 : 0) + (showDetailsColumn ? 1 : 0) + (showStatus ? 1 : 0) + (showCost ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
+        const colSpan = (showDate ? 1 : 0) + (showEntityColumn ? 1 : 0) + (showDetailsColumn ? 1 : 0) + (showStatus ? 1 : 0) + (showCost ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
         const rowsHtml = txRows.length ? txRows.join('') : `<tr><td colspan="${colSpan}" class="no-transactions">No transactions for this category</td></tr>`;
         
         // Only show category header if category name exists
@@ -3184,8 +3190,7 @@ export default function ReportsImport() {
               <thead style="background:#f8fafc;">
                 <tr>
                   ${showDate ? `<th>Date</th>` : ''}
-                  ${showOrganization ? `<th>Organization</th>` : ''}
-                  ${showPayee ? `<th>Payee</th>` : ''}
+                  ${showEntityColumn ? `<th>${entityColumnHeader}</th>` : ''}
                   ${showDetailsColumn ? `<th>${detailsColumnHeader}</th>` : ''}
                   ${showStatus ? `<th>Status</th>` : ''}
                   ${showCost ? `<th class="text-right">Cost</th>` : ''}
@@ -3211,98 +3216,17 @@ export default function ReportsImport() {
 
 
 
-    if (isMultiMonth) {
+    // Use single view without date-based categorization
 
-      // Group transactions by month
+    body = generateCategoryBlocks(transactionsWithRefs);
 
-      const byMonth = {};
+    
 
-      transactionsWithRefs.forEach(t => {
+    const totalGroups = groupTransactionsCategoryPayee(transactionsWithRefs);
 
-        const d = t.dateOfPayment instanceof Date ? t.dateOfPayment : (t.dateOfPayment ? new Date(t.dateOfPayment) : null);
+    totalGroups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
 
-        const monthKey = (d && !isNaN(d.getTime())) ? d.toISOString().slice(0, 7) : 'Unknown';
-
-        if (!byMonth[monthKey]) byMonth[monthKey] = [];
-
-        byMonth[monthKey].push(t);
-
-      });
-
-
-
-      const sortedMonths = Object.keys(byMonth).sort();
-
-
-
-      body = sortedMonths.map((monthKey) => {
-        const monthDate = new Date(monthKey + '-01');
-        const monthTotal = (byMonth[monthKey] || []).reduce((sum, t) => {
-          const n = Number(t.amount);
-          return sum + (isFinite(n) ? n : 0);
-        }, 0);
-        const monthName = isNaN(monthDate.getTime()) ? '' : monthDate.toLocaleDateString('default', { month: 'long' });
-        const monthLabel = isNaN(monthDate.getTime()) ? 'Unknown Date' : monthDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
-
-        const monthContent = generateCategoryBlocks(byMonth[monthKey]);
-
-        return `
-          <div class="card" style="margin-top: 8px;">
-            <div style="font-weight:800;">${esc(monthLabel)}</div>
-            ${monthContent}
-            <div class="summary-card" style="margin-top: 10px;">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th class="text-right">Total Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>${esc(monthName ? `Total ${monthName}` : 'Total')}</td>
-                    <td class="text-right">${displayAmount(monthTotal)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      // For summary table, we still want total per category across all months
-
-      const totalGroups = groupTransactionsCategoryPayee(transactionsWithRefs);
-
-      totalGroups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
-
-      catSummaryRows = totalGroups.map((c) => `
-
-        <tr>
-
-          <td>${esc(c.categoryName)}</td>
-
-          <td class="text-right">${esc(formatAmount(c.categoryTotal, 'KES'))}</td>
-
-        </tr>
-
-      `).join('');
-
-
-
-    } else {
-
-      // Single month / standard view
-
-      body = generateCategoryBlocks(transactionsWithRefs);
-
-      
-
-      const totalGroups = groupTransactionsCategoryPayee(transactionsWithRefs);
-
-      totalGroups.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
-
-      catSummaryRows = totalGroups.map((c) => `
+    catSummaryRows = totalGroups.map((c) => `
 
       <tr>
 
@@ -3313,8 +3237,6 @@ export default function ReportsImport() {
       </tr>
 
     `).join('');
-
-    }
 
 
 
