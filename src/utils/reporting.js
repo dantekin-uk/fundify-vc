@@ -336,9 +336,37 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
     const r = rows[idx] || {};
 
     const date = parseDate(pick(r, ['dateOfPayment', 'date_of_payment', 'date', 'transaction_date', 'transactiondate', 'payment_date', 'paymentdate', 'posting_date', 'postingdate']));
-    let amount = parseAmount(pick(r, ['amount', 'amt', 'value', 'transaction_amount', 'transactionamount', 'expenditure_amount', 'expenditureamount', 'total', 'sum']));
+    
+    // Pick 'total' as primary amount, and 'cost' as secondary. 
+    // If 'total' is present, use it. If not, fallback to 'cost' or other amount names.
+    const totalRaw = pick(r, ['total', 'sum', 'grand_total', 'grandtotal', 'transaction_amount', 'transactionamount']);
+    const costRaw = pick(r, ['cost', 'unit_cost', 'unitcost', 'price', 'unit_price', 'unitprice', 'rate']);
+    const otherAmtRaw = pick(r, ['amount', 'amt', 'value', 'expenditure_amount', 'expenditureamount']);
+    
+    let totalVal = parseAmount(totalRaw);
+    let costVal = parseAmount(costRaw);
+    let otherAmtVal = parseAmount(otherAmtRaw);
+    
+    let amount = 0;
+    if (!isNaN(totalVal)) {
+      amount = totalVal;
+    } else if (!isNaN(otherAmtVal)) {
+      amount = otherAmtVal;
+    } else if (!isNaN(costVal)) {
+      amount = costVal;
+    } else {
+      amount = NaN; // Will be handled by warnInvalidAmount
+    }
+
     let category = String(pick(r, ['category', 'type', 'classification', 'expense_category', 'expensecategory']) ?? '').trim();
     let payeeName = String(pick(r, ['payeeName', 'payee_name', 'payee', 'recipient', 'supplier', 'vendor', 'beneficiary', 'paid_to', 'paidto', 'made_to', 'madeto']) ?? '').trim();
+    const organization = String(pick(r, ['organization', 'org', 'organisation', 'company']) ?? '').trim();
+    const status = String(pick(r, ['status', 'state', 'condition']) ?? '').trim();
+
+    // If payee is empty but organization is present, use organization as payee
+    if (!payeeName && organization) {
+      payeeName = organization;
+    }
 
     // Extract Expenditure (main item/purpose) and Description (extra details)
     let expenditure = String(pick(r, ['expenditure', 'item', 'particulars', 'purpose', 'description', 'expense', 'goods_services', 'goodsservices', 'service', 'goods']) ?? '').trim();
@@ -400,9 +428,12 @@ export function normalizeImportedRowsToTransactions(rawRows, { defaultPaymentMet
       payeeName,
       expenditure,
       description,
+      organization,
+      status,
       phoneNumber: phoneNumberRaw || null,
       voucherNo: voucherNoRaw || null,
       amount,
+      cost: isNaN(costVal) ? null : costVal,
       paymentMethod: paymentMethod || null,
       referenceCode: referenceCode || null,
       projectName: projectName || null,

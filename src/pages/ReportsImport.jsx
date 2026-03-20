@@ -2439,12 +2439,11 @@ export default function ReportsImport() {
 
 
     // Normalize categories to handle inconsistencies (case, whitespace, empty).
-    // This prevents issues like 'Staffs' and 'staffs' being treated as different categories,
-    // and groups items with no category under 'Uncategorized'.
+    // This prevents issues like 'Staffs' and 'staffs' being treated as different categories.
     // Important: rely on normalization logic to handle any fill-down; do not apply a second fill-down here.
     const transactions = (normalizedResult.transactions || []).map(t => {
       const rawCategory = String(t.category || '').trim();
-      const category = rawCategory ? toTitleCase(rawCategory) : 'Uncategorized';
+      const category = rawCategory ? toTitleCase(rawCategory) : ''; // No 'Uncategorized' default
       return { ...t, category };
     });
 
@@ -2640,6 +2639,12 @@ export default function ReportsImport() {
 
       amount: t.amount,
 
+      cost: t.cost,
+
+      organization: t.organization,
+
+      status: t.status,
+
       paymentMethod: t.paymentMethod || '',
 
       referenceCode: t.referenceCode || '',
@@ -2662,6 +2667,9 @@ export default function ReportsImport() {
        return !method.includes('CHEQUE');
     });
     const showDescription = periodTx.some(t => String(t.description || '').trim() !== '');
+    const showCost = periodTx.some(t => t.cost != null && t.cost !== 0);
+    const showOrg = periodTx.some(t => String(t.organization || '').trim() !== '');
+    const showStatus = periodTx.some(t => String(t.status || '').trim() !== '');
 
     const rows = periodTx.map((t) => {
       const row = {
@@ -2670,10 +2678,19 @@ export default function ReportsImport() {
         Payee: t.payeeName,
         Expenditure: t.expenditure,
       };
+      if (showOrg) {
+        row.Organization = t.organization;
+      }
+      if (showStatus) {
+        row.Status = t.status;
+      }
       if (showDescription) {
         row.Description = t.description;
       }
-      row['Amount (KSH)'] = Math.round(t.amount || 0);
+      if (showCost) {
+        row.Cost = t.cost || '';
+      }
+      row['Total (KSH)'] = Math.round(t.amount || 0);
       row['Payment Method'] = t.paymentMethod;
 
       if (showMpesa) {
@@ -2743,6 +2760,8 @@ export default function ReportsImport() {
       });
       const showPayee = allCategoryTx.some(t => String(t.payeeName || '').trim() !== '');
       const showDescription = allCategoryTx.some(t => String(t.description || '').trim() !== '');
+      const showStatus = allCategoryTx.some(t => String(t.status || '').trim() !== '');
+      const showCost = allCategoryTx.some(t => t.cost != null && t.cost !== 0);
       const showReference = allCategoryTx.some(t => {
          const method = (t.paymentMethod || '').toUpperCase();
          const hasMpesaRef = (method.includes('MPESA') || method.includes('M-PESA') || !t.paymentMethod) && String(t.referenceCode || '').trim() !== '';
@@ -2760,13 +2779,15 @@ export default function ReportsImport() {
           const hasPayee = String(t.payeeName || '').trim() !== '';
           const n = Number(t.amount);
           const hasAmount = isFinite(n) && n !== 0;
-          return hasDate || hasExp || hasDesc || hasPayee || hasAmount;
+          const hasCost = t.cost != null && t.cost !== 0;
+          return hasDate || hasExp || hasDesc || hasPayee || hasAmount || hasCost;
         })
         .map((t) => {
           const dateCell = t.dateOfPayment ? new Date(t.dateOfPayment).toLocaleDateString() : '';
           const payeeCell = String(t.payeeName || '').trim();
           const expCell = String(t.expenditure || '').trim();
           const descCell = String(t.description || '').trim();
+          const costCell = t.cost ? formatAmount(t.cost, 'KES') : '';
           const methodCell = String(t.paymentMethod || '').trim();
           const methodUpper = methodCell.toUpperCase();
           const isMpesaTx = methodUpper.includes('MPESA') || methodUpper.includes('M-PESA') || !t.paymentMethod;
@@ -2779,7 +2800,9 @@ export default function ReportsImport() {
             ${showPayee ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(payeeCell)}</td>` : ''}
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(expCell)}</td>
             ${showDescription ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(descCell)}</td>` : ''}
-            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${esc(amountCell)}</td>
+            ${showStatus ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">${esc(t.status || '')}</td>` : ''}
+            ${showCost ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;color:#64748b;">${esc(costCell)}</td>` : ''}
+            <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;font-weight:600;">${esc(amountCell)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">${esc(methodCell || '')}</td>
             ${showReference ? `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-family: 'Courier New', monospace;white-space:nowrap;">${esc(refCell)}</td>` : ''}
           </tr>
@@ -2788,59 +2811,42 @@ export default function ReportsImport() {
         .join('');
 
 
-      const colSpan = (showDate ? 1 : 0) + (showPayee ? 1 : 0) + 1 + (showDescription ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
-      const rowsHtml = txRows || `<tr><td colspan="${colSpan}" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName)} in this period</td></tr>`;
+      const colSpan = (showDate ? 1 : 0) + (showPayee ? 1 : 0) + 1 + (showDescription ? 1 : 0) + (showCost ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
+      const rowsHtml = txRows || `<tr><td colspan="${colSpan}" style="padding:12px;text-align:center;color:#64748b;font-style:italic;">No transactions for ${esc(c.categoryName || 'this section')} in this period</td></tr>`;
 
-
+      const categoryHeader = c.categoryName ? `
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:8px;">
+            <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
+            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))}</div>
+          </div>` : '';
 
       return `
-
         <section style="margin-top:18px;">
-
-          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:8px;">
-
-            <div style="font-size:16px;font-weight:800;">Category: ${esc(c.categoryName)}</div>
-
-            <div style="font-size:16px;font-weight:800;">Total: ${esc(formatAmount(c.categoryTotal, 'KES'))}</div>
-
-          </div>
-
+          ${categoryHeader}
           <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-
             <thead style="background:#f8fafc;">
-
               <tr>
-
                 ${showDate ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Date</th>` : ''}
-
                 ${showPayee ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Payee</th>` : ''}
 
                 <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Expenditure</th>
 
                 ${showDescription ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Description</th>` : ''}
 
-                <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Amount</th>
+                ${showStatus ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Status</th>` : ''}
 
+                ${showCost ? `<th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Cost</th>` : ''}
+                <th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Total</th>
                 <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Method</th>
-
                 ${showReference ? `<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Reference</th>` : ''}
-
               </tr>
-
             </thead>
-
             <tbody>
-
               ${rowsHtml}
-
             </tbody>
-
           </table>
-
         </section>
-
       `;
-
     }).join('');
 
 
@@ -3875,16 +3881,13 @@ export default function ReportsImport() {
 
 
 
-    const catSummaryRows = groupedWithRefs.map((c) => `
-
+    const catSummaryRows = groupedWithRefs
+      .filter(c => c.categoryName || c.categoryTotal > 0)
+      .map((c) => `
       <w:tr>
-
-        <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName)}</w:t></w:r></w:p></w:tc>
-
+        <w:tc><w:p><w:r><w:t>${escapeXml(c.categoryName || 'General Expenditure')}</w:t></w:r></w:p></w:tc>
         <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(c.categoryTotal, 'KES'))}</w:t></w:r></w:p></w:tc>
-
       </w:tr>
-
     `).join('');
 
 
@@ -3899,6 +3902,8 @@ export default function ReportsImport() {
       });
       const showPayee = allCategoryTx.some(t => String(t.payeeName || '').trim() !== '');
       const showDescription = allCategoryTx.some(t => String(t.description || '').trim() !== '');
+      const showStatus = allCategoryTx.some(t => String(t.status || '').trim() !== '');
+      const showCost = allCategoryTx.some(t => t.cost != null && t.cost !== 0);
       const showReference = allCategoryTx.some(t => {
          const method = (t.paymentMethod || '').toUpperCase();
          const hasMpesaRef = (method.includes('MPESA') || method.includes('M-PESA') || !t.paymentMethod) && String(t.referenceCode || '').trim() !== '';
@@ -3924,7 +3929,11 @@ export default function ReportsImport() {
 
             ${showDescription ? `<w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.description || '')}</w:t></w:r></w:p></w:tc>` : ''}
 
-            <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(formatAmount(t.amount, 'KES'))}</w:t></w:r></w:p></w:tc>
+            ${showStatus ? `<w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.status || '')}</w:t></w:r></w:p></w:tc>` : ''}
+
+            ${showCost ? `<w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:color w:val="666666"/></w:rPr><w:t>${escapeXml(t.cost ? formatAmount(t.cost, 'KES') : '')}</w:t></w:r></w:p></w:tc>` : ''}
+
+            <w:tc><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>${escapeXml(formatAmount(t.amount, 'KES'))}</w:t></w:r></w:p></w:tc>
 
             <w:tc><w:p><w:pPr><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:t>${escapeXml(t.paymentMethod || '')}</w:t></w:r></w:p></w:tc>
 
@@ -3936,22 +3945,25 @@ export default function ReportsImport() {
         }).join('');
 
 
-      const colSpan = (showDate ? 1 : 0) + (showPayee ? 1 : 0) + 1 + (showDescription ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
+      const colSpan = (showDate ? 1 : 0) + (showPayee ? 1 : 0) + 1 + (showDescription ? 1 : 0) + (showCost ? 1 : 0) + 1 + 1 + (showReference ? 1 : 0);
       const rowsXml = txRows || `
 
         <w:tr>
 
-          <w:tc><w:tcPr><w:gridSpan w:val="${colSpan}"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:i/><w:color w:val="666666"/><w:t>No transactions for ${escapeXml(c.categoryName)} in this period</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:gridSpan w:val="${colSpan}"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:i/><w:color w:val="666666"/><w:t>No transactions for ${escapeXml(c.categoryName || 'this section')} in this period</w:t></w:r></w:p></w:tc>
 
         </w:tr>
 
       `;
 
+      const categoryHeaderXml = c.categoryName ? `
+        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal, 'KES'))})</w:t></w:r></w:p>` : '';
+
 
 
       return `
 
-        <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Category: ${escapeXml(c.categoryName)} (Total: ${escapeXml(formatAmount(c.categoryTotal, 'KES'))})</w:t></w:r></w:p>
+        ${categoryHeaderXml}
 
           <w:tbl>
 
@@ -3979,19 +3991,23 @@ export default function ReportsImport() {
 
             <w:tr>
 
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Date</w:t></w:r></w:p></w:tc>
+              ${showDate ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Date</w:t></w:r></w:p></w:tc>` : ''}
 
-              <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payee</w:t></w:r></w:p></w:tc>
+              ${showPayee ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Payee</w:t></w:r></w:p></w:tc>` : ''}
 
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Expenditure</w:t></w:r></w:p></w:tc>
 
               ${showDescription ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Description</w:t></w:r></w:p></w:tc>` : ''}
 
-              <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Amount</w:t></w:r></w:p></w:tc>
+              ${showStatus ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Status</w:t></w:r></w:p></w:tc>` : ''}
+
+              ${showCost ? `<w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Cost</w:t></w:r></w:p></w:tc>` : ''}
+
+              <w:tc><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Total</w:t></w:r></w:p></w:tc>
 
               <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Method</w:t></w:r></w:p></w:tc>
 
-              ${showMpesa ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>M-Pesa Ref</w:t></w:r></w:p></w:tc>` : ''}
+              ${showReference ? `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Reference</w:t></w:r></w:p></w:tc>` : ''}
 
             </w:tr>
 
@@ -4723,11 +4739,15 @@ export default function ReportsImport() {
 
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Category</th>
 
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Payee</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Organization/Payee</th>
 
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Description</th>
 
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Status</th>
+
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Cost</th>
+
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Total</th>
 
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Method</th>
 
@@ -4750,6 +4770,10 @@ export default function ReportsImport() {
                         <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{r.payeeName}</td>
 
                         <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{r.description}</td>
+
+                        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{r.status}</td>
+
+                        <td className="px-4 py-3 text-sm text-right whitespace-nowrap text-slate-500 dark:text-slate-400">{r.cost ? formatAmount(r.cost, 'KES') : '-'}</td>
 
                         <td className="px-4 py-3 text-sm text-right whitespace-nowrap font-medium text-slate-900 dark:text-slate-100">{formatAmount(r.amount || 0, 'KES')} KSH</td>
 
@@ -4787,29 +4811,37 @@ export default function ReportsImport() {
 
                   <div key={c.categoryName} className="rounded-lg ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-900 p-3">
 
-                    <div className="flex items-center justify-between">
+                    {c.categoryName && (
 
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">{c.categoryName}</div>
+                      <div className="flex items-center justify-between mb-2">
 
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatAmount(c.categoryTotal || 0, 'KES')} KSH</div>
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">{c.categoryName}</div>
 
-                    </div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatAmount(c.categoryTotal || 0, 'KES')} KSH</div>
 
-                    <div className="mt-2 space-y-2">
+                      </div>
+
+                    )}
+
+                    <div className="space-y-2">
 
                       {c.payees.slice(0, 6).map((p) => (
 
                         <div key={p.payeeName} className="rounded-md bg-slate-50 dark:bg-slate-800/40 p-2">
 
-                          <div className="flex items-center justify-between">
+                          {p.payeeName && (
 
-                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{p.payeeName}</div>
+                            <div className="flex items-center justify-between mb-2">
 
-                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatAmount(p.subtotal || 0, 'KES')} KSH</div>
+                              <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{p.payeeName}</div>
 
-                          </div>
+                              <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{formatAmount(p.subtotal || 0, 'KES')} KSH</div>
 
-                          <div className="mt-2 overflow-x-auto">
+                            </div>
+
+                          )}
+
+                          <div className="overflow-x-auto">
 
                             <table className="min-w-full text-xs">
 
