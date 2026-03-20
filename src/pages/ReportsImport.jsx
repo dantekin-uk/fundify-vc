@@ -8,32 +8,22 @@ import { formatAmount } from '../utils/format';
 
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 
+import Button from '../components/ui/Button';
+
+import { Input } from '../components/ui/Input';
+
 import {
-
   buildExecutiveSummary,
-
   buildIntelligenceInsights,
-
   deriveReportingPeriod,
-
   filterByPeriod,
-
   genReferenceCode,
-
   groupTransactionsCategoryPayee,
-
   normalizeImportedRowsToTransactions,
-
   readSpreadsheetFile,
-
 } from '../utils/reporting';
 
-
-
-import FinancialReport from '../components/FinancialReport';
-
 function toCSV(rows) {
-
   if (!rows.length) return '';
 
   const headers = Object.keys(rows[0]);
@@ -5336,7 +5326,7 @@ export default function ReportsImport() {
         <CardContent className="space-y-6">
           {/* Logo Upload */}
           <div className="space-y-2">
-            <Label htmlFor="financial-logo">Upload Logo (optional)</Label>
+            <label htmlFor="financial-logo" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Upload Logo (optional)</label>
             <Input
               id="financial-logo"
               type="file"
@@ -5352,7 +5342,7 @@ export default function ReportsImport() {
 
           {/* File Import */}
           <div className="space-y-2">
-            <Label htmlFor="financial-file">Import CSV/Excel File</Label>
+            <label htmlFor="financial-file" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Import CSV/Excel File</label>
             <Input
               id="financial-file"
               type="file"
@@ -5370,7 +5360,7 @@ export default function ReportsImport() {
 
           {/* Period Label Input */}
           <div className="space-y-2">
-            <Label htmlFor="financial-period">Period Label</Label>
+            <label htmlFor="financial-period" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Period Label</label>
             <Input
               id="financial-period"
               type="text"
